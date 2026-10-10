@@ -176,8 +176,8 @@ We report the groups separately so synthetic results never inflate the real ones
 ## Run it locally
 
 ```bash
-git clone https://github.com/YOUR-USER/OfferProof.git
-cd OfferProof
+git clone https://github.com/Shyamanth-3/OfferProof_SerpAPI.git
+cd OfferProof_SerpAPI
 
 # backend
 cd backend
@@ -186,25 +186,26 @@ pip install -r requirements.txt
 cp .env.example .env        # add SERPAPI_API_KEY for live mode (optional)
 uvicorn app.main:app --reload
 
-# frontend (new terminal)
+# frontend (new terminal, from the repo root)
 cd frontend
 npm ci
 npm run dev
 ```
 
-The app works with **no API key**. It runs in Cached mode on 70 committed, recorded SerpApi responses.
+The app works with **no API key**. It runs in Cached mode on 62 committed, recorded SerpApi responses.
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `SERPAPI_API_KEY` | none | Enables live searches |
 | `MODE` | `cached` | `cached` or `live` |
-| `LIVE_DAILY_CAP` | `200` | Daily live-search ceiling. When it's hit, requests fall back to cached |
+| `LIVE_DAILY_CAP` | `200` | Daily live-search ceiling. When it's hit, checks say so and are skipped |
+| `LIVE_RESERVE` | `0` (off) | Stops live searching once your real SerpApi balance drops to this many searches |
 | `SEARCH_TIMEOUT_SECONDS` | `8` | Per-search timeout. A failure becomes `unknown` |
 
 ```bash
-cd backend && pytest             # 131 tests
-cd frontend && npm test          # 8 tests
-python evals/run_eval.py         # regenerates evals/report.md
+cd backend && pytest             # 148 tests
+cd frontend && npm test          # 14 tests
+cd backend && python -m evals.run_eval   # regenerates evals/report.md
 ```
 
 ### API
@@ -242,7 +243,7 @@ Google Maps address check · self-hosted OCR assets · WhatsApp bot · placement
 
 <div align="center">
 
-Built in one day for the **SerpApi India Hackathon 2026** by [Shyamanth Nadella](https://github.com/YOUR-USER).
+Built in one day for the **SerpApi India Hackathon 2026** by [Shyamanth Nadella](https://github.com/Shyamanth-3).
 
 *Never pay to get hired.*
 
