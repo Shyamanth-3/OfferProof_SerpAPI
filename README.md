@@ -6,7 +6,7 @@
 
 **Paste a job or internship offer. We check whether it can actually be traced back to the company it claims to be from, using live search evidence and fixed rules. No AI decides.**
 
-[**Live demo**](https://YOUR-APP.onrender.com) · [Demo video](#demo) · [How it works](#how-it-works) · [Accuracy](#accuracy-honestly-reported)
+[**Live demo**](https://offerproof.onrender.com/) · [Demo video](#demo) · [How it works](#how-it-works) · [Accuracy](#accuracy-honestly-reported)
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
