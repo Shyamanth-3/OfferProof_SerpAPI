@@ -3,6 +3,7 @@ import { getQuota, getSamples, runCheck, type CheckResponse, type Mode, type Sam
 import { Results } from "./Results";
 import { ScamDrum, type DrumWord } from "./ScamDrum";
 import { VERDICT_STYLE } from "./VerdictBadge";
+import { useScreenshot } from "../useScreenshot";
 
 const MAX = 10_000;
 const MIN = 10; // matches the backend minimum
@@ -30,6 +31,24 @@ export function Checker() {
   const area = useRef<HTMLDivElement>(null);
   const detailsEl = useRef<HTMLDetailsElement>(null);
   const companyEl = useRef<HTMLInputElement>(null);
+
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  // any text edit (typing, OCR) drops chip-filled details: a sample's company/sender would silently override it
+  const forgetChipDetails = () => {
+    if (fromChip) {
+      setCompany("");
+      setSender("");
+      setRole("");
+      setFromChip(false);
+    }
+  };
+  const shot = useScreenshot((t) => {
+    forgetChipDetails();
+    setText((prev) => (prev.trim() ? `${prev}\n\n${t}` : t).slice(0, MAX)); // never overwrite what the user already typed
+  });
+  const imageFrom = (files?: FileList | null) => Array.from(files ?? []).find((f) => f.type.startsWith("image/"));
 
   const addCompany = () => {
     if (detailsEl.current) detailsEl.current.open = true;
@@ -87,7 +106,63 @@ export function Checker() {
             {s.label}
           </button>
         ))}
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) shot.start(f);
+            e.target.value = ""; // allow picking the same file again
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          disabled={shot.s.reading}
+          className="cursor-pointer rounded-full border border-dashed border-line bg-transparent px-4 py-2 text-[14px] text-fg transition-colors hover:border-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Add screenshot
+        </button>
       </div>
+
+      {(shot.s.reading || shot.s.thumb) && (
+        <div className="mt-4 flex items-center gap-4 rounded-[14px] border border-line bg-raised p-3">
+          {shot.s.thumb && <img src={shot.s.thumb} alt="Screenshot you added" className="h-16 w-16 shrink-0 rounded-[8px] object-cover" />}
+          <div className="min-w-0 flex-1">
+            {shot.s.reading ? (
+              <>
+                <p className="meta m-0 text-dim" role="status">
+                  {shot.s.label}
+                </p>
+                <div
+                  role="progressbar"
+                  aria-label="Screenshot reading progress"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={shot.s.pct}
+                  className="mt-2 h-1 overflow-hidden rounded-full bg-line"
+                >
+                  <div className="h-full bg-white transition-[width]" style={{ width: `${shot.s.pct}%` }} />
+                </div>
+              </>
+            ) : (
+              <p className="meta m-0 text-dim">Screenshot read. Its text is in the box below.</p>
+            )}
+          </div>
+          <button type="button" onClick={shot.cancel} className="cursor-pointer rounded-full border border-line bg-transparent px-4 py-1.5 text-[13px] text-fg">
+            {shot.s.reading ? "Cancel" : "Remove"}
+          </button>
+        </div>
+      )}
+      {shot.s.error && (
+        <p role="alert" className="meta mt-3 mb-0 text-amber">
+          {shot.s.error}
+        </p>
+      )}
 
       <form
         className="mt-4"
@@ -106,24 +181,47 @@ export function Checker() {
             maxLength={MAX}
             onChange={(e) => {
               setText(e.target.value);
-              if (fromChip) {
-                // a sample's company/sender would silently override whatever the user pastes next
-                setCompany("");
-                setSender("");
-                setRole("");
-                setFromChip(false);
+              forgetChipDetails();
+              shot.clearReview();
+            }}
+            onPaste={(e) => {
+              const f = imageFrom(e.clipboardData.files);
+              if (f) {
+                e.preventDefault(); // an image on the clipboard, not text
+                shot.start(f);
+              }
+            }}
+            onDragOver={(e) => {
+              if (Array.from(e.dataTransfer.items).some((i) => i.kind === "file")) {
+                e.preventDefault();
+                setDragging(true);
+              }
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              setDragging(false);
+              const f = imageFrom(e.dataTransfer.files);
+              if (f) {
+                e.preventDefault();
+                shot.start(f);
               }
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit();
             }}
             placeholder="Paste the full message here…"
-            className={`${inputCls} min-h-[220px] resize-y pb-8`}
+            className={`${inputCls} min-h-[220px] resize-y pb-8 ${dragging ? "border-white" : ""}`}
           />
           <span className="meta pointer-events-none absolute right-4 bottom-3 text-faint">
             {text.length.toLocaleString()} / {MAX.toLocaleString()}
           </span>
         </div>
+
+        {shot.s.review && (
+          <p role="note" className="meta mt-2 mb-0 text-amber">
+            Check the text before running — screenshot reading can make mistakes.
+          </p>
+        )}
 
         <details ref={detailsEl} className="mt-3" open={Boolean(company || sender || role) || undefined}>
           <summary className="meta cursor-pointer text-dim">Details (optional)</summary>
@@ -159,6 +257,7 @@ export function Checker() {
           <span className="meta text-dim">{mode === "cached" ? "Cached uses recorded searches" : "Live runs real searches"}</span>
         </div>
         <p className="meta mt-4 mb-0 text-faint">Aadhaar and PAN numbers are removed before anything is searched.</p>
+        <p className="meta mt-1 mb-0 text-faint">Your screenshot is read on this device and never uploaded.</p>
         <p className="meta mt-1 mb-0 text-faint">Tip: include the subject line and sender. The company name is often only there.</p>
       </form>
 
