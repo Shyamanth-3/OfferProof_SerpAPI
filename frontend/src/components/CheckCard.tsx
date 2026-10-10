@@ -30,10 +30,14 @@ function EvidenceItem({ e }: { e: Evidence }) {
   );
 }
 
-export function CheckCard({ check, delay }: { check: CheckResult; delay: number }) {
+export function CheckCard({ check, delay, highlighted = false }: { check: CheckResult; delay: number; highlighted?: boolean }) {
   const s = check.status;
   return (
-    <article className="fade-up rounded-[14px] border border-line p-5" style={{ animationDelay: `${delay}ms` }}>
+    <article
+      id={`check-${check.id}`}
+      className={`fade-up scroll-mt-24 rounded-[14px] border p-5 transition-colors ${highlighted ? "border-white" : "border-line"}`}
+      style={{ animationDelay: `${delay}ms` }}
+    >
       <header className="flex items-center gap-3">
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATUS_DOT[s]}`} aria-hidden="true" />
         <h3 className="m-0 text-[17px] font-medium">{check.title}</h3>

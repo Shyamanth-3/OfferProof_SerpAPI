@@ -6,6 +6,8 @@ _State as of 2026-10-10. Backend and frontend are built, connected and tested. D
 
 A student pastes a job or internship offer (or a screenshot of it); OfferProof checks whether it can be **traced back to the company it claims to be from**, shows every finding with its live-search source, and gives a verdict decided by **fixed rules, not AI**. There is no LLM anywhere in the project.
 
+Two modes: the **quick check** (paste an offer) and **Investigate the full journey** (listing, recruiter, interview, payment, offer), which asks a second question: *does this recruitment journey match the company's real hiring process, and where does it first diverge?*
+
 ## The problem it targets
 
 Fake offers on WhatsApp, Telegram and email, especially during placement season. Many impersonate real companies (TCS, Infosys, Wipro), so "is the company real?" is the wrong question. The right one is "did this offer really come from that company?" The tool also catches a second kind of trap: genuine-looking "internships" that are really paid courses sold with a job guarantee.
@@ -95,6 +97,60 @@ Job boards (Internshala, Indeed, Naukri, LinkedIn…) are ignored for the "reuse
 - the **official careers URL** and whether the role is listed there, and a **`mailto:`** link with a subject and the message as the body but **no recipient** (the student takes the address from the official site).
 - **Hard rule:** every linkable or actionable field comes only from the *trusted* official domain. With an untrusted domain there is no careers link and no mailto, and the advice says to look the company up yourself. This is covered by tests.
 
+## Investigate the full journey
+
+`POST /api/investigate` takes what the student remembers about each stage; every stage is optional, but at least one must have content (otherwise 422). `/api/check` is untouched and still powers the quick check.
+
+| Stage | Input |
+|---|---|
+| Listing | the URL where they saw the job, and/or the pasted listing text |
+| Recruiter | name, email, phone, and the channel (email, LinkedIn, job portal, WhatsApp, Telegram, phone call, other) |
+| Interview | format (official portal or video, other video, phone, chat only, none), "asked to pay?", "asked for Aadhaar/PAN/bank details before the offer?" |
+| Offer | the pasted offer text (or a screenshot of it) |
+
+- **Safety:** all stage text goes through the same Aadhaar/PAN redaction first, every field has the same 10,000-character limit, and **the listing URL is never fetched** (only its domain is judged as text; a test fails if anything touches the network).
+- **Company** is resolved in this order: the company field, the offer text, the listing text, the domain of the recruiter's email (never free mail or hiring platforms). The role prefers the listing.
+- The recruiter's email and phone feed the existing sender and payment-ID checks exactly as an offer's sender does.
+
+### New checks (journey only)
+
+| Check | Weight | Search | What it asks |
+|---|---|---|---|
+| Where the job was listed (`listing_source`) | 10 | none | The listing URL's domain: the trusted official site → pass; a known job board → info; a lookalike of the official domain → fail; any other site → warn; no link → unknown. |
+| Listing wording trace (`listing_clone`) | 15 | up to 2 | The wording-trace logic on the listing text, plus: the same text under *another company's name* → warn. A fee in the listing is flagged as a payment demand. |
+| Interview process (`interview_process`) | 15 | 1, trusted domain only | No interview or chat only → fail (`NO_REAL_INTERVIEW`); phone or video → pass; documents asked before an offer → at least warn. If the official domain is trusted, links the company's published hiring process (info). |
+| Listing vs offer (`listing_offer_consistency`) | 15 | none | Compares company, role, pay (normalised to per month, tolerance 25%) and city across the two texts. Different company → fail (`COMPANY_MISMATCH`); other differences → warn, each listed as "Listing said X, offer says Y." |
+| Recruiter profile (`recruiter_trace`) | 0 (context) | 1 | A LinkedIn profile whose title has both the name and the company → info ("profiles can be faked"); otherwise unknown. Only title and link are kept; never pass, never fail. |
+
+The existing checks run too (sender, payment-ID trace, offer red flags, wording trace of the offer, official careers page, and so on). Text checks report "unknown", never "pass", when no offer text was given. The journey has its own registry: total weight is **175** (120 + 55), while the quick check stays at 120.
+
+### Journey overrides (can only raise severity)
+
+| Override | Raises to | Trigger |
+|---|---|---|
+| `PAYMENT_IN_PROCESS` | High risk | The student was asked to pay, or a fee is demanded in any stage's text |
+| `COMPANY_MISMATCH` | High risk | The offer names a different company than the listing |
+| `LOOKALIKE_LISTING` | High risk | The listing is on a domain that imitates the company's |
+| `NO_REAL_INTERVIEW` | Caution | No interview, or chat only |
+
+These only fire when the journey checks are present, so the quick check's overrides are unchanged.
+
+### The timeline
+
+The response adds `timeline` (five nodes: listing, recruiter, interview, payment, offer) and `first_divergence`. Each node is `matches`, `diverges`, `unverified` or `not_provided`:
+
+- No input for the stage → `not_provided`. Any deciding check `fail` or `warn` → `diverges`. At least one `pass` and nothing worse → `matches`. Otherwise → `unverified` (`info` and `unknown` never make a stage match).
+- **Listing** is decided by `listing_source` and `listing_clone`. **Recruiter** by `sender_identity` and `identifier_trace`, and it also diverges if the channel is WhatsApp or Telegram and there is no email from a trusted domain. **Interview** by `interview_process`. **Offer** by the offer's red flags, its wording trace, and listing-vs-offer.
+- **Payment** diverges if the payment override fired, matches only if the student said they weren't asked to pay (and no fee is demanded in the texts), and is otherwise unverified.
+- The job-listing and company-registry checks are shown on the offer stage but do not decide it: their warning means "couldn't confirm", not "the journey diverged".
+- `first_divergence` is the first diverging stage in journey order; its reason is the strongest finding at that stage (fail beats warn, higher weight breaks ties), first sentence only.
+
+### Journey samples
+
+Both are **synthetic** (our texts, not real messages), served by `/api/samples` with `kind: "journey"`:
+- **Cloned listing:** a listing on `careers-infosys.in`, a recruiter on Telegram with a Gmail address, chat-only interview, asked to pay, and an offer whose role, pay and city differ from the listing. Expected and tested: High risk, first divergence at the listing.
+- **Genuine journey:** listing on the official site, recruiter on the official domain, official-portal interview, no payment, consistent offer. Expected and tested: not High risk, no divergence.
+
 ## What the user sees (frontend)
 
 Dark single page (Vite + React + TypeScript + Tailwind v4, no UI or animation library):
@@ -102,6 +158,7 @@ Dark single page (Vite + React + TypeScript + Tailwind v4, no UI or animation li
 - **Hero:** a 3D rotating drum of giant red scam phrases (CSS 3D + `requestAnimationFrame`, pauses off-screen, play/pause button, static under reduced motion).
 - **Checker:** textarea, sample chips, **Add screenshot**, optional details (company, sender, role), Cached/Live toggle. Chip-filled details are cleared when you type your own text so they can't silently override it.
 - **While checking:** a compact drum spins, then lands on SCAM? / VERIFY / CLEAN / UNSURE.
+- **Mode switch** above the checker: *Quick check* (everything above, unchanged) or *Investigate the full journey*: four collapsible optional panels in journey order (where you found the job, who contacted you, the interview, the offer), journey sample chips, and the same offer box with screenshot reading. Results add **The journey** timeline above the check cards: five nodes (green matches, red diverges, grey unverified, outlined not provided; each also labelled in words), horizontal on desktop and vertical on mobile, a red marker and the callout "Your journey left the company's real process here:" at the first divergence, and clicking a node scrolls to and highlights that stage's check cards.
 - **Result:** verdict badge, "decided by fixed rules, not AI", risk score and coverage, override banner, "What we read" (including the **Fingerprint** phrases), one card per check (status, finding, engine, exact query, up to 3 evidence links with retrieval time; the wording-trace card quotes the searched phrase and groups results as Scam reports / Same text, other names / Company's own site), the **Verify it yourself** panel (open careers page, copy message, email the company, "Role listed on official site ✓"), next steps. If no company was found, a prompt with an "Add company" button.
 - **Footer strip:** searches used, engines, time, mode, and remaining SerpApi quota in Live mode.
 
@@ -117,20 +174,20 @@ Dark single page (Vite + React + TypeScript + Tailwind v4, no UI or animation li
 ```
 OfferProof/
 ├── backend/            FastAPI (Python 3.11), serves the built frontend too
-│   ├── app/            main, pipeline, registry, models, privacy, extract, fingerprint, serp, policy, verify_kit, samples
+│   ├── app/            main, pipeline, journey, registry, models, privacy, extract, fingerprint, serp, policy, verify_kit, samples
 │   │   └── checks/     one module per check
 │   ├── fixtures/       56 recorded SerpApi responses (committed) so Cached mode works offline
 │   ├── cache/          live-search disk cache (git-ignored)
 │   ├── scripts/        record_fixtures.py (records only searches missing from fixtures/; asks first; --yes skips)
 │   ├── evals/          labeled.jsonl (real-received + synthetic), run_eval.py, report.md
-│   └── tests/          81 tests
+│   └── tests/          130 tests
 └── frontend/           Vite + React + TS + Tailwind v4 (dist/ is served by the backend)
     └── src/            components/, ocr.ts, ocrClean.ts (+ test), useScreenshot.ts, api.ts
 ```
 
-- **API:** `POST /api/check?mode=live|cached`, `GET /api/samples`, `GET /api/quota`, `GET /api/health`. The response only ever gained fields (`verify_kit`, `extracted.fingerprint`, `phrases`, `evidence[].kind`); nothing was renamed or removed.
+- **API:** `POST /api/check?mode=live|cached`, `POST /api/investigate?mode=live|cached`, `GET /api/samples`, `GET /api/quota`, `GET /api/health`. The response only ever gained fields (`verify_kit`, `extracted.fingerprint`, `phrases`, `evidence[].kind`); nothing was renamed or removed.
 - **Search layer:** SerpApi official client; disk cache; fixtures; per-request call counter; "no results" treated as a valid empty answer.
-- **Searches per offer:** sender 1, impersonation news 1, job listing 1, registration 1, fraud notice 1 (needs an official domain), payment-ID trace 0–3, wording trace 0–2, careers page 1 (trusted domain only). Typically 6–8, **at most 11**.
+- **Searches per offer:** sender 1, impersonation news 1, job listing 1, registration 1, fraud notice 1 (needs an official domain), payment-ID trace 0–3, wording trace 0–2, careers page 1 (trusted domain only). Typically 6–8, **at most 11**. A full journey adds the recruiter profile, listing wording (up to 2) and the hiring-process page: typically 10–13, **at most 15**.
 - **Quota protection:** live searches capped per day (`LIVE_DAILY_CAP`, default 200); offer text limited to 10,000 characters; per-search timeout `SEARCH_TIMEOUT_SECONDS` (default 8).
 - **Config (`backend/.env`):** `SERPAPI_API_KEY`, `MODE` (`cached` default or `live`), `LIVE_DAILY_CAP`, `SEARCH_TIMEOUT_SECONDS`. The file is git-ignored.
 - **Git:** the repo is initialised, with one commit per build step.
@@ -145,7 +202,7 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 
 ## How it has been verified
 
-- **81 backend tests** and **8 frontend tests** pass, with no network: unit tests (negation, Hinglish, lookalikes, privacy, policy, extraction, phrase selection, classification, verify kit), the 5 acceptance samples against recorded searches, and regression tests built from real emails that slipped through. They also pass with the local `cache/` hidden, so a fresh clone reproduces everything from the committed fixtures.
+- **130 backend tests** and **8 frontend tests** pass, with no network (journey tests cover every new check and override, the timeline rules, redaction in every stage, the never-fetched listing URL, both journey samples, and that the quick check and its samples are unchanged): unit tests (negation, Hinglish, lookalikes, privacy, policy, extraction, phrase selection, classification, verify kit), the 5 acceptance samples against recorded searches, and regression tests built from real emails that slipped through. They also pass with the local `cache/` hidden, so a fresh clone reproduces everything from the committed fixtures.
 - **Browser checks** (Edge, scripted) at 375, 768 and 1280 px: every sample chip, the verify-kit buttons (copy, mailto, careers link), a screenshot upload by picker, paste and drag-drop (a WhatsApp-style image we rendered ourselves, light and dark, not a real chat), cancel, bad type, too big, error and Retry, pause and reduced motion.
 - **Eval (cached, fixtures only).** Real-received: 2 offers, scam recall 1/1, strict 0/1, no genuine rows yet. Synthetic: 6 offers, scam recall 3/3, strict 3/3, false-alarm rate 0/2. Combined: scam recall 4/4, strict 3/4, false-alarm rate 0/2. This is a smoke test, not accuracy; the report says so.
 
@@ -159,12 +216,18 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 - **It checks traceability, not intent.** A genuine company's own mail with a misleading pitch is caught only by the text rules (job guarantee, fees, form links).
 - **Small companies often have no findable official site**, so the sender check stays "unknown" for them, and for an unconfirmed site it is only a warning.
 - **Third-party hosting of OCR assets:** the OCR engine and language data come from `cdn.jsdelivr.net` on first use.
+- **The journey is only as good as the student's memory.** Interview and payment answers are self-reported; unanswered stages stay `not_provided`/`unverified`, never "matches".
+- **The listing URL is never opened**, so a page that has since been taken down, or one whose content differs from what the student saw, can't be compared. Only its domain is judged.
+- **Listing-vs-offer comparison is regex-based**: company, role, pay and city are only compared when both texts state them in a form the extractors recognise.
+- **Recruiter profile lookup is weak evidence by design** (profiles can be faked), so it is context only.
 - **Not legal advice.**
 
 ## Not done yet
 
-1. **`render.yaml` and the README** (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work).
-2. **More real labelled offers** for the eval, ideally with some genuine ones; none of the real rows is genuine yet.
-3. **GitHub link** in the footer (currently a placeholder).
-4. **Self-host the OCR assets** instead of loading them from a CDN.
-5. **Future ideas:** a WhatsApp bot, a placement-cell dashboard, a moderated reporting channel.
+1. **Record the journey samples' searches** (about 13 new searches; needs approval). Until then, the two journey samples run from the built-in known-company list, with their searches shown as unrecorded.
+2. **A real "Genuine journey".** J2 is synthetic. Replacing it with a real Google Jobs listing for a big recruiter needs one live search plus its recording, and approval.
+3. **`render.yaml` and the README** (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work).
+4. **More real labelled offers** for the eval, ideally with some genuine ones; none of the real rows is genuine yet.
+5. **GitHub link** in the footer (currently a placeholder).
+6. **Self-host the OCR assets** instead of loading them from a CDN.
+7. **Future ideas:** a forums check (public complaint threads), an investigator agent that drafts follow-up questions, a WhatsApp bot, a placement-cell dashboard, a moderated reporting channel.

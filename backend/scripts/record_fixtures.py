@@ -1,4 +1,4 @@
-"""Record the searches the samples and eval rows need into fixtures/ (so MODE=cached works offline).
+"""Record the searches the samples, journey samples and eval rows need into fixtures/ (so MODE=cached works offline).
 
 Only searches MISSING from fixtures/ are made; existing fixtures are never re-recorded. Shows how many
 it will make and asks first (--yes skips the question). Fixtures are raw SerpApi responses, never edited.
@@ -15,26 +15,32 @@ import json  # noqa: E402
 import shutil  # noqa: E402
 import sys  # noqa: E402
 
-from app import pipeline  # noqa: E402
-from app.models import CheckRequest  # noqa: E402
-from app.samples import SAMPLES  # noqa: E402
+from app import journey, pipeline  # noqa: E402
+from app.models import CheckRequest, JourneyInput  # noqa: E402
+from app.samples import JOURNEY_SAMPLES, SAMPLES  # noqa: E402
 from app.serp import CACHE, FIXTURES, CacheMiss, Hit, Serp, cache_key  # noqa: E402
 
 EVAL_ROWS = pipeline.__file__.rsplit("app", 1)[0] + "evals/labeled.jsonl"
 
 
-def requests() -> list[CheckRequest]:
-    reqs = [CheckRequest(**{k: v for k, v in s.items() if k != "label"}) for s in SAMPLES.values()]
-    seen = {r.offer_text for r in reqs}
+def jobs() -> list[tuple[str, callable]]:
+    """(label, mode -> coroutine) for every quick sample, eval row and journey sample."""
+    out = []
+    reqs = [(k, CheckRequest(**{f: v for f, v in s.items() if f not in ("label", "kind")})) for k, s in SAMPLES.items()]
+    seen = {r.offer_text for _, r in reqs}
     if os.path.exists(EVAL_ROWS):
         for line in open(EVAL_ROWS, encoding="utf-8"):
             if line.strip():
                 row = json.loads(line)
                 if row["text"] not in seen:
                     seen.add(row["text"])
-                    reqs.append(CheckRequest(offer_text=row["text"], company=row.get("company"),
-                                             sender_email=row.get("sender_email"), role=row.get("role")))
-    return reqs
+                    reqs.append((row["id"], CheckRequest(offer_text=row["text"], company=row.get("company"),
+                                                         sender_email=row.get("sender_email"), role=row.get("role"))))
+    for name, r in reqs:
+        out.append((name, lambda mode, r=r: pipeline.check(r, mode)))
+    for name, s in JOURNEY_SAMPLES.items():
+        out.append((name, lambda mode, j=JourneyInput(**s["journey"]): journey.investigate(j, mode)))
+    return out
 
 
 def full(params: dict) -> dict:
@@ -78,16 +84,17 @@ class Recording(Serp):
 
 async def main(yes: bool):
     FIXTURES.mkdir(exist_ok=True)
-    reqs = requests()
+    todo = jobs()
     pipeline.Serp = Planner
-    for r in reqs:
-        await pipeline.check(r, "cached")
+    for _, fn in todo:
+        await fn("cached")
     from_cache = [k for k in missing if (CACHE / f"{k}.json").exists()]
     api = len(missing) - len(from_cache)
-    print(f"{len(reqs)} offers. {len(missing)} searches are missing from fixtures/: "
+    print(f"{len(todo)} offers/journeys. {len(missing)} searches are missing from fixtures/: "
           f"{len(from_cache)} already in the local cache (free), {api} would be NEW SerpApi searches.")
-    print("(A lower bound: searches that depend on these results are only discovered once they exist; "
-          "at most ~11 per offer.)")
+    for p in missing.values():
+        print(f"   {p['engine']:12} {p.get('q', '')[:100]}")
+    print("(A lower bound: searches that depend on these results are only discovered once they exist.)")
     if not missing:
         return print("Nothing to record.")
     if not yes:
@@ -99,9 +106,9 @@ async def main(yes: bool):
             return print("Aborted. Nothing was spent.")
 
     pipeline.Serp = Recording
-    for r in reqs:
-        out = await pipeline.check(r, "live")
-        print(f"  {(r.company or r.offer_text[:30]):32} {out.verdict}")
+    for name, fn in todo:
+        out = await fn("live")
+        print(f"  {name[:34]:34} {out.verdict}")
     print(f"Done: {made} new SerpApi searches made, {len(copied)} searches copied into fixtures/.")
 
 

@@ -1,5 +1,7 @@
-import type { CheckResponse, Mode, Status } from "../api";
+import { useRef, useState } from "react";
+import type { CheckResponse, JourneyResponse, Mode, Status } from "../api";
 import { CheckCard } from "./CheckCard";
+import { Timeline } from "./Timeline";
 import { VerdictBadge } from "./VerdictBadge";
 import { VerifyPanel } from "./VerifyPanel";
 
@@ -9,7 +11,18 @@ const Chip = ({ children, mono }: { children: React.ReactNode; mono?: boolean })
   <span className={`rounded-full border border-line px-3 py-1 text-[13px] break-all ${mono ? "font-mono" : ""}`}>{children}</span>
 );
 
-export function Results({ r, quota, mode, onAddCompany }: { r: CheckResponse; quota: number | null; mode: Mode; onAddCompany: () => void }) {
+export function Results({ r, quota, mode, onAddCompany }: { r: CheckResponse | JourneyResponse; quota: number | null; mode: Mode; onAddCompany: () => void }) {
+  const journey = "timeline" in r ? r : null;
+  const [highlight, setHighlight] = useState<string[]>([]);
+  const clearTimer = useRef<number>(0);
+  // clicking a timeline node scrolls to that stage's check cards and rings them for a moment
+  const showChecks = (ids: string[]) => {
+    const first = ids.map((id) => document.getElementById(`check-${id}`)).find(Boolean);
+    first?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlight(ids);
+    window.clearTimeout(clearTimer.current);
+    clearTimer.current = window.setTimeout(() => setHighlight([]), 2600);
+  };
   const sorted = [...r.checks].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
   const weighted = r.checks.filter((c) => c.weight > 0);
   const ran = weighted.filter((c) => c.scored).length;
@@ -53,6 +66,8 @@ export function Results({ r, quota, mode, onAddCompany }: { r: CheckResponse; qu
         )}
       </section>
 
+      {journey && <Timeline nodes={journey.timeline} firstDivergence={journey.first_divergence} onSelect={showChecks} />}
+
       {!company && (
         <div role="note" className="fade-up flex flex-wrap items-center justify-between gap-4 rounded-[14px] border border-amber/50 p-5" style={{ animationDelay: "60ms" }}>
           <p className="m-0 max-w-[34rem]">
@@ -93,7 +108,7 @@ export function Results({ r, quota, mode, onAddCompany }: { r: CheckResponse; qu
         <h2 className="m-0 text-[27px] font-medium">The checks</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {sorted.map((c, i) => (
-            <CheckCard key={c.id} check={c} delay={160 + i * 40} />
+            <CheckCard key={c.id} check={c} delay={160 + i * 40} highlighted={highlight.includes(c.id)} />
           ))}
         </div>
       </section>

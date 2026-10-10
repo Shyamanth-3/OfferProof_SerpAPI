@@ -81,12 +81,38 @@ export interface CheckResponse {
   mode: string;
 }
 
+export type Channel = "email" | "linkedin" | "job_portal" | "whatsapp" | "telegram" | "phone_call" | "other";
+export type InterviewFormat = "official_portal_or_video" | "other_video" | "phone" | "chat_only" | "none";
+
+export interface JourneyInput {
+  company?: string | null;
+  role?: string | null;
+  listing?: { url?: string | null; text?: string | null } | null;
+  recruiter?: { name?: string | null; email?: string | null; phone?: string | null; channel?: Channel | null } | null;
+  interview?: { format?: InterviewFormat | null; asked_to_pay?: boolean | null; asked_for_documents_before_offer?: boolean | null } | null;
+  offer_text?: string | null;
+}
+
+export type TimelineStage = "listing" | "recruiter" | "interview" | "payment" | "offer";
+export interface TimelineNode {
+  stage: TimelineStage;
+  status: "matches" | "diverges" | "unverified" | "not_provided";
+  headline: string;
+  check_ids: string[];
+}
+export interface JourneyResponse extends CheckResponse {
+  timeline: TimelineNode[];
+  first_divergence: { stage: string; reason: string } | null;
+}
+
 export interface Sample {
   label: string;
-  offer_text: string;
+  kind?: "quick" | "journey";
+  offer_text?: string; // quick samples
   company?: string;
   sender_email?: string;
   role?: string;
+  journey?: JourneyInput; // journey samples
 }
 
 async function http<T>(url: string, init?: RequestInit): Promise<T> {
@@ -115,3 +141,10 @@ export const runCheck = (body: CheckRequest, mode: Mode) =>
 
 export const getQuota = (mode: Mode) =>
   http<{ total_searches_left: number | null }>(`/api/quota?mode=${mode}`);
+
+export const runJourney = (body: JourneyInput, mode: Mode) =>
+  http<JourneyResponse>(`/api/investigate?mode=${mode}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
