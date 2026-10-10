@@ -5,3 +5,6 @@ __pycache__/
 backend/cache/
 node_modules/
 frontend/dist/
+
+# real third-party details from received emails: kept locally, never published
+backend/evals/private/
