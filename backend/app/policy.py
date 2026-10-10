@@ -80,14 +80,42 @@ def template_reported(checks):
         return Override(rule="TEMPLATE_REPORTED", verdict="HIGH_RISK", reason="This message's wording matches text reported as a scam elsewhere.")
 
 
-RULES = [fee_demanded, lookalike_domain, identifier_reported, free_mail_sender, off_platform_only, third_party_sender, job_guarantee, template_reported]
+# Journey overrides. They only fire when the journey checks are present, so /api/check is unaffected.
+def payment_in_process(checks):
+    ip = _get(checks, "interview_process")
+    if ip is None:
+        return None
+    if ip.meta.get("asked_to_pay") or any("FEE" in c.flags for c in checks):  # FEE in any stage's text
+        return Override(rule="PAYMENT_IN_PROCESS", verdict="HIGH_RISK", reason="Genuine companies don't charge candidates at any stage of hiring.")
 
 
-def decide(checks: list[CheckResult]) -> dict:
+def company_mismatch(checks):
+    c = _get(checks, "listing_offer_consistency")
+    if c and "COMPANY_MISMATCH" in c.flags:
+        return Override(rule="COMPANY_MISMATCH", verdict="HIGH_RISK", reason="The offer names a different company than the listing you applied to.")
+
+
+def no_real_interview(checks):
+    c = _get(checks, "interview_process")
+    if c and "NO_REAL_INTERVIEW" in c.flags:
+        return Override(rule="NO_REAL_INTERVIEW", verdict="CAUTION", reason="Genuine offers follow an interview; this one didn't.")
+
+
+def lookalike_listing(checks):
+    c = _get(checks, "listing_source")
+    if c and c.status == "fail":
+        return Override(rule="LOOKALIKE_LISTING", verdict="HIGH_RISK", reason="The job was listed on a site that imitates the company's own domain.")
+
+
+RULES = [fee_demanded, lookalike_domain, identifier_reported, free_mail_sender, off_platform_only, third_party_sender, job_guarantee, template_reported,
+         payment_in_process, company_mismatch, no_real_interview, lookalike_listing]
+
+
+def decide(checks: list[CheckResult], total_weight: int = TOTAL_WEIGHT) -> dict:
     scored = [c for c in checks if c.scored]  # unknown and info never count, for or against
     weight = sum(c.weight for c in scored)
     score = round(100 * sum(POINTS[c.status] * c.weight for c in scored) / weight) if weight else None
-    coverage = weight / TOTAL_WEIGHT
+    coverage = weight / total_weight
 
     if coverage < 0.5:
         verdict = "NOT_ENOUGH_EVIDENCE"

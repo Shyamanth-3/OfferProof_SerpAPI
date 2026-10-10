@@ -8,9 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from . import serp  # noqa: F401  (loads .env)
-from .models import CheckRequest, CheckResponse
+from .journey import investigate
+from .models import CheckRequest, CheckResponse, JourneyInput, JourneyResponse
 from .pipeline import check
-from .samples import SAMPLES
+from .samples import JOURNEY_SAMPLES, SAMPLES
 
 app = FastAPI(title="OfferProof")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
@@ -27,6 +28,11 @@ async def check_offer(req: CheckRequest, mode: Optional[Mode] = None):
     return await check(req, mode or default_mode())
 
 
+@app.post("/api/investigate", response_model=JourneyResponse)
+async def investigate_journey(req: JourneyInput, mode: Optional[Mode] = None):
+    return await investigate(req, mode or default_mode())  # 422 comes from JourneyInput if no stage has content
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -34,7 +40,7 @@ def health():
 
 @app.get("/api/samples")
 def samples():
-    return SAMPLES
+    return {**{k: {**v, "kind": "quick"} for k, v in SAMPLES.items()}, **JOURNEY_SAMPLES}
 
 
 @app.get("/api/quota")

@@ -30,3 +30,40 @@ SAMPLES = {
         "sender_email": "campus@infosys.com",
     },
 }
+
+
+# ---- journey samples (served by /api/samples with kind="journey"; kept apart from SAMPLES so quick-check
+# tests, fixtures and the eval seed keep iterating only quick-check offers) ----
+JOURNEY_SAMPLES = {
+    "J1_CLONED_LISTING": {
+        "kind": "journey",
+        "label": "Cloned listing",
+        "source": "synthetic",
+        "journey": {
+            "company": "Infosys Limited",
+            "listing": {
+                "url": "https://careers-infosys.in/jobs/associate-software-engineer",
+                "text": "Infosys Limited is hiring an Associate Software Engineer in Bengaluru. Stipend ₹20,000 per month. Apply after an online assessment and a technical interview.",
+            },
+            "recruiter": {"name": "Rohit Verma", "email": "infosys.hr.rohit@gmail.com", "phone": "9000000001", "channel": "telegram"},
+            "interview": {"format": "chat_only", "asked_to_pay": True, "asked_for_documents_before_offer": True},
+            "offer_text": "Greetings from Infosys Limited. You are selected as Data Entry Executive in Noida. Stipend ₹40,000 per month. Pay ₹1,500 refundable registration fee to infosys.hr@okaxis and send your Aadhaar copy on Telegram t.me/infosyshr today.",
+        },
+    },
+    # Synthetic: the texts are ours, not a real listing. Swap in a real Google Jobs listing only once one has been recorded.
+    "J2_GENUINE_JOURNEY": {
+        "kind": "journey",
+        "label": "Genuine journey",
+        "source": "synthetic",
+        "journey": {
+            "company": "Infosys Limited",
+            "listing": {
+                "url": "https://www.infosys.com/careers/",
+                "text": "Infosys Limited is hiring a Systems Engineer in Bengaluru. Stipend ₹30,000 per month during training. Selection is through an online assessment and interviews.",
+            },
+            "recruiter": {"name": "Campus Hiring Team", "email": "campus@infosys.com", "channel": "email"},
+            "interview": {"format": "official_portal_or_video", "asked_to_pay": False, "asked_for_documents_before_offer": False},
+            "offer_text": "Dear Candidate, Greetings from Infosys Limited. Following your interviews, we are pleased to offer you the role of Systems Engineer in Bengaluru with a stipend of ₹30,000 per month. Your detailed offer letter and joining instructions are on the Infosys candidate portal. Please do not share your credentials with anyone.",
+        },
+    },
+}

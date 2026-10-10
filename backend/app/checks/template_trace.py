@@ -19,6 +19,11 @@ JOB_BOARDS = {
     "simplyhired.com", "timesjobs.com", "hirist.tech", "wellfound.com", "cutshort.io", "letsintern.com",
 }
 _WORD = re.compile(r"[\w'’-]+")
+# "Software Engineer at Acme Corp", "by Acme", "| Acme Labs": a capitalised name after a company-introducing word
+_NAMED = re.compile(r"(?:\bat|\bby|\bfrom|\bwith|\bjoin|@|\|)\s+([A-Z][\w&.]*(?:\s+[A-Z][\w&.]*){0,3})")
+_NOT_A_COMPANY = {"internship", "intern", "interns", "jobs", "job", "india", "remote", "home", "work", "fresher", "freshers",
+                  "students", "student", "apply", "today", "online", "hiring", "career", "careers", "mumbai", "delhi",
+                  "bengaluru", "bangalore", "pune", "hyderabad", "chennai", "noida", "gurgaon", "gurugram", "kolkata"}
 
 
 def _classify(ctx, blob: str, domain: str) -> str | None:
@@ -34,11 +39,21 @@ def _classify(ctx, blob: str, domain: str) -> str | None:
     return None
 
 
-def run(ctx, serp):
-    ex = ctx.extracted or Extracted(company=ctx.company, sender_email=ctx.sender_email)
-    phrases = select_phrases(ctx.text, ex)
+def names_other_company(ctx, raw: str) -> bool:
+    """Heuristic: the title/snippet introduces a capitalised company name that isn't ours."""
+    ours = set(core_tokens(ctx.company or ""))
+    for m in _NAMED.finditer(raw):
+        toks = [t for t in core_tokens(m.group(1)) if len(t) >= 4 and t not in _NOT_A_COMPANY]
+        if toks and not (set(toks) & ours):
+            return True
+    return False
+
+
+def trace(ctx, serp, text, extracted, *, id, title, weight, other_company_rule=False):
+    """Shared by the offer's wording trace and the listing's clone detection."""
+    phrases = select_phrases(text, extracted)
     if not phrases:
-        return result(ID, TITLE, WEIGHT, "unknown", "The message is too short or too generic to fingerprint.", engine=ENGINE)
+        return result(id, title, weight, "unknown", "The message is too short or too generic to fingerprint.", engine=ENGINE)
     queries, hits = [], {"scam_report": [], "reused": [], "official": []}
     for ph in phrases:
         q = f'"{ph}"'
@@ -55,13 +70,23 @@ def run(ctx, serp):
                 hits[kind].append((domain, ev(res, r.get("title", ""), r.get("link", ""), r.get("snippet", ""), kind)))
     meta = dict(engine=ENGINE, query=" | ".join(queries), phrases=phrases)
     if hits["scam_report"]:
-        return result(ID, TITLE, WEIGHT, "fail", "This exact wording appears in scam reports online.",
+        return result(id, title, weight, "fail", "This exact wording appears in scam reports online.",
                       evidence=[e for _, e in hits["scam_report"]], **meta)
+    if other_company_rule and not hits["official"]:
+        other = [e for _, e in hits["reused"] if names_other_company(ctx, f"{e.title} {e.snippet}")]
+        if other:
+            return result(id, title, weight, "warn", "This listing's text also appears under another company's name.",
+                          evidence=other, **meta)
     if len({d for d, _ in hits["reused"]}) >= 2 and not hits["official"]:
-        return result(ID, TITLE, WEIGHT, "warn",
+        return result(id, title, weight, "warn",
                       "This exact wording appears on other sites under different names — typical of mass-produced offers.",
                       evidence=[e for _, e in hits["reused"]], **meta)
     if hits["official"]:
-        return result(ID, TITLE, WEIGHT, "pass", "The wording matches the company's own pages.",
+        return result(id, title, weight, "pass", "The wording matches the company's own pages.",
                       evidence=[e for _, e in hits["official"]], **meta)
-    return result(ID, TITLE, WEIGHT, "unknown", "The wording isn't found elsewhere online. That's not evidence either way.", **meta)
+    return result(id, title, weight, "unknown", "The wording isn't found elsewhere online. That's not evidence either way.", **meta)
+
+
+def run(ctx, serp):
+    ex = ctx.extracted or Extracted(company=ctx.company, sender_email=ctx.sender_email)
+    return trace(ctx, serp, ctx.text, ex, id=ID, title=TITLE, weight=WEIGHT)
