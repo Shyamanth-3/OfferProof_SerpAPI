@@ -404,7 +404,7 @@ export function Checker() {
 
         {phase === "done" && result && (
           <div className="mt-10">
-            <Results r={result} quota={quota} mode={ranMode} onAddCompany={addCompany} />
+            <Results r={result} quota={quota} mode={ranMode} onAddCompany={addCompany} onRetry={() => retry.current?.()} />
           </div>
         )}
       </div>

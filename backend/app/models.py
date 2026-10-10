@@ -37,6 +37,7 @@ class CheckResult(BaseModel):
     evidence: list[Evidence] = []
     flags: list[str] = []
     phrases: list[str] = []  # template_trace: the exact phrases that were searched
+    skipped: Optional[str] = None  # why the check didn't run: slow | failed | not_recorded (None = it ran)
     # internal facts for policy (official_domain, lookalike, ...); not sent to clients
     meta: dict = Field(default_factory=dict, exclude=True)
 

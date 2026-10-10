@@ -3,6 +3,8 @@ import logging
 import os
 import time
 
+import requests
+
 from . import policy, privacy, verify_kit
 from .checks import result
 from .extract import extract
@@ -15,18 +17,25 @@ log = logging.getLogger("offerproof")
 CHECK_TIMEOUT = float(os.getenv("SEARCH_TIMEOUT_SECONDS", "8"))
 
 
+# SerpApi's own client timeout is a requests.Timeout, which is NOT an asyncio/builtin TimeoutError, so both are listed.
+# Without this a slow search was reported as "The search failed". SerpApi often answers in 10-60 s, well past our limit.
+SLOW = (asyncio.TimeoutError, requests.exceptions.Timeout)
+
+
 async def _run(mod, ctx, serp):
     try:
         return await asyncio.wait_for(asyncio.to_thread(mod.run, ctx, serp), CHECK_TIMEOUT)
     except CacheMiss:
-        why = "No recorded search for this offer (cached mode)."
-    except asyncio.TimeoutError:
-        log.warning("%s timed out", mod.ID)
-        why = "The search timed out, so this check was skipped."
+        why, skipped = "No recorded search for this offer (cached mode).", "not_recorded"
+    except SLOW as e:
+        log.warning("%s was too slow: %r", mod.ID, e)
+        why, skipped = "A search was too slow to finish, so this check was skipped. Running the check again usually works.", "slow"
     except Exception as e:
         log.warning("%s failed: %r", mod.ID, e)
-        why = "The search failed, so this check was skipped."
-    return result(mod.ID, mod.TITLE, mod.WEIGHT, "unknown", why, engine=mod.ENGINE)
+        why, skipped = "The search failed, so this check was skipped.", "failed"
+    res = result(mod.ID, mod.TITLE, mod.WEIGHT, "unknown", why, engine=mod.ENGINE)
+    res.skipped = skipped
+    return res
 
 
 async def check(req: CheckRequest, mode: str) -> CheckResponse:

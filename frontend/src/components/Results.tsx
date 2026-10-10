@@ -11,7 +11,8 @@ const Chip = ({ children, mono }: { children: React.ReactNode; mono?: boolean })
   <span className={`rounded-full border border-line px-3 py-1 text-[13px] break-all ${mono ? "font-mono" : ""}`}>{children}</span>
 );
 
-export function Results({ r, quota, mode, onAddCompany }: { r: CheckResponse | JourneyResponse; quota: number | null; mode: Mode; onAddCompany: () => void }) {
+export function Results({ r, quota, mode, onAddCompany, onRetry }: { r: CheckResponse | JourneyResponse; quota: number | null; mode: Mode; onAddCompany: () => void; onRetry: () => void }) {
+  const slow = r.checks.filter((c) => c.skipped === "slow").length;
   const journey = "timeline" in r ? r : null;
   const [highlight, setHighlight] = useState<string[]>([]);
   const clearTimer = useRef<number>(0);
@@ -65,6 +66,17 @@ export function Results({ r, quota, mode, onAddCompany }: { r: CheckResponse | J
           </div>
         )}
       </section>
+
+      {slow > 0 && (
+        <div role="note" className="fade-up flex flex-wrap items-center justify-between gap-4 rounded-[14px] border border-amber/50 p-5">
+          <p className="m-0 max-w-[34rem]">
+            {slow === 1 ? "1 check was" : `${slow} checks were`} skipped because a search was too slow. That says nothing about the offer. Checking again often works: searches that already finished aren't repeated.
+          </p>
+          <button type="button" onClick={onRetry} className="cursor-pointer rounded-full border border-white bg-transparent px-5 py-2 text-[14px] text-fg">
+            Check again
+          </button>
+        </div>
+      )}
 
       {journey && <Timeline nodes={journey.timeline} firstDivergence={journey.first_divergence} onSelect={showChecks} />}
 

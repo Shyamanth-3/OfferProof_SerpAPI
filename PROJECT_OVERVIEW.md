@@ -220,6 +220,7 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 - **The listing URL is never opened**, so a page that has since been taken down, or one whose content differs from what the student saw, can't be compared. Only its domain is judged.
 - **Listing-vs-offer comparison is regex-based**: company, role, pay and city are only compared when both texts state them in a form the extractors recognise.
 - **Recruiter profile lookup is weak evidence by design** (profiles can be faked), so it is context only.
+- **Live searches can be slow.** SerpApi's own timings on ordinary Google and Google Jobs queries ranged from under 1 s to over 60 s in testing, while the live limit is 8 s per check (`SEARCH_TIMEOUT_SECONDS`). A check that times out is shown as "unknown", labelled "too slow" (the response carries `skipped: "slow"`), and the results page offers **Check again**; searches that already finished are served from the local cache and not repeated. A higher `SEARCH_TIMEOUT_SECONDS` (for example 20) completes more checks but makes slow runs wait longer.
 - **Not legal advice.**
 
 ## Not done yet
