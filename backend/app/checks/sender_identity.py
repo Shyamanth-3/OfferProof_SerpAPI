@@ -66,11 +66,21 @@ def is_lookalike(sender_domain: str, official_domain: str) -> bool:
     return o in host and not host.endswith(o)  # tcs.com.evil.in
 
 
-def classify(sender_domain: str, official: list[str]) -> tuple[str, str, dict]:
-    """-> (status, reason, meta). Pure, so it is unit-testable without search."""
+def _matches(sd: str, domains: list[str]) -> bool:
+    return any(sd == registrable(o) or sd.endswith("." + registrable(o)) for o in domains)
+
+
+def classify(sender_domain: str, official: list[str], trusted: list[str] | None = None) -> tuple[str, str, dict]:
+    """-> (status, reason, meta). Pure, so it is unit-testable without search.
+
+    `trusted` is the subset of `official` confirmed by the knowledge panel or the known-company
+    list (None = treat all as trusted). Only a trusted match can pass.
+    """
     sd = host_of(sender_domain)
-    if any(sd == registrable(o) or sd.endswith("." + registrable(o)) for o in official):
+    if _matches(sd, official if trusted is None else trusted):
         return "pass", f"The sender's domain ({sd}) matches the company's official domain.", {}
+    if _matches(sd, official):
+        return "warn", "The sender matches the top search result for this company, but we couldn't confirm that site is official.", {"untrusted_match": True}
     if registrable(sd) in FREE_MAIL:
         return "fail", f"The offer was sent from a free mail address ({sd}), not the company's own domain ({official[0]}).", {"free_mail": True}
     for o in official:
@@ -128,6 +138,6 @@ def run(ctx, serp):
         return result(ID, TITLE, WEIGHT, "unknown",
                       "No sender email in the message — most WhatsApp/Telegram offers have none, so this can't be verified.",
                       engine=ENGINE, query=query, evidence=evidence, official=official, trusted=trusted)
-    status, reason, meta = classify(ctx.sender_email, official)
+    status, reason, meta = classify(ctx.sender_email, official, trusted)
     return result(ID, TITLE, WEIGHT, status, reason, engine=ENGINE, query=query, evidence=evidence,
                   official=official, trusted=trusted, company=ctx.company, known_brand=bool(_seed(ctx.company)), **meta)

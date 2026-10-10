@@ -42,7 +42,7 @@ async def check(req: CheckRequest, mode: str) -> CheckResponse:
     s = results["sender_identity"]
     ctx.official = s.meta.get("official", [])
     ctx.sender_on_official = s.status == "pass"
-    trusted = s.meta.get("trusted", [])
+    trusted = ctx.trusted = s.meta.get("trusted", [])
     results.update(zip((m.ID for m in STAGE2), await asyncio.gather(*(_run(m, ctx, serp) for m in STAGE2))))
 
     checks = [results[m.ID] for m in ORDER]

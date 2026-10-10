@@ -214,3 +214,49 @@ def test_soft_flags_dont_fire_on_ordinary_offers_or_when_negated():
     assert "TRAINING_FIRST" not in flags("We do not offer a performance-based stipend. Training phase is 2 weeks.")
 
 
+
+
+# ---- checkpoint A: only a trusted official domain can pass -------------------------
+def test_untrusted_match_warns_never_passes():
+    status, reason, meta = classify("hr@nexora202.online", ["nexora202.online"], trusted=[])
+    assert status == "warn" and meta == {"untrusted_match": True}
+    assert "couldn't confirm that site is official" in reason
+    assert classify("x@mail.nexora202.online", ["nexora202.online"], trusted=[])[0] == "warn"
+
+
+def test_trusted_matches_pass():
+    assert classify("hr@acme.example", ["acme.example"], trusted=["acme.example"])[0] == "pass"   # knowledge panel
+    assert classify("hr@wipro.com", ["wipro.com"], trusted=["wipro.com"])[0] == "pass"             # seed list
+    assert classify("hr@zohocorp.com", ["zoho.com", "zohocorp.com"], trusted=["zoho.com", "zohocorp.com"])[0] == "pass"
+
+
+def test_other_branches_unchanged_with_untrusted_official():
+    assert classify("x@gmail.com", ["nexora202.online"], trusted=[])[0] == "fail"
+    assert classify("x@nexora202-careers.in", ["nexora202.online"], trusted=[])[2].get("lookalike")
+
+
+def _run_sender(monkeypatch, search, company, sender):
+    import app.pipeline as pl
+    from app.checks import sender_identity as si
+
+    ctx = Ctx("", company, None, sender, Identifiers())
+    return si.run(ctx, Stub(search))
+
+
+def test_sender_check_end_to_end_trust(monkeypatch):
+    organic = {"organic_results": [{"title": "Nexora", "link": "https://nexora202.online/", "snippet": ""}]}
+    r = _run_sender(monkeypatch, lambda p: organic, "Nexora Labs", "hr@nexora202.online")
+    assert r.status == "warn" and not r.meta["trusted"]
+    kg = {"knowledge_graph": {"website": "https://www.nexora.example/"}}
+    r = _run_sender(monkeypatch, lambda p: kg, "Nexora Labs", "hr@nexora.example")
+    assert r.status == "pass" and r.meta["trusted"] == ["nexora.example"]
+    r = _run_sender(monkeypatch, lambda p: {}, "Wipro Limited", "hr@wipro.com")
+    assert r.status == "pass"
+
+
+def test_ctx_exposes_official_domain_trust():
+    c = Ctx("", "X", None, None, Identifiers(), official=["guess.com", "real.com"], trusted=["real.com"])
+    assert c.official_domain == "real.com" and c.official_domain_trusted
+    c = Ctx("", "X", None, None, Identifiers(), official=["guess.com"])
+    assert c.official_domain == "guess.com" and not c.official_domain_trusted
+    assert Ctx("", "X", None, None, Identifiers()).official_domain is None

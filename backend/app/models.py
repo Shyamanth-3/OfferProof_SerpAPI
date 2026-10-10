@@ -90,4 +90,14 @@ class Ctx:
     sender_email: Optional[str]
     identifiers: Identifiers
     official: list[str] = field(default_factory=list)  # filled after sender_identity
+    trusted: list[str] = field(default_factory=list)  # subset of official: knowledge panel or known-company list
     sender_on_official: bool = False
+
+    @property
+    def official_domain(self) -> Optional[str]:
+        """Best domain to talk about: a trusted one if we have it, else the top guess, else None."""
+        return (self.trusted or self.official or [None])[0]
+
+    @property
+    def official_domain_trusted(self) -> bool:
+        return bool(self.trusted)
