@@ -57,7 +57,7 @@ Matching handles negation within the same clause ("We never charge any registrat
 
 ### Wording trace (the "template" insight)
 
-Fake offers are mass-produced templates, so the same distinctive paragraph is reused under different company names. `app/fingerprint.py` (pure, no network) picks up to two phrases of 8–12 words: it splits sentences with the same clause-safe splitter as the red-flag rules, strips everything specific to the recipient or company (emails, URLs, phones, UPI IDs, amounts, dates, greeting names, the company name, the sender's domain), rejects short, stopword-heavy or generic-HR sentences, and never builds a phrase across a removed span. `checks/template_trace.py` searches each phrase in quotes and keeps a result only if it really contains ≥60% of the phrase's words:
+Fake offers are mass-produced templates, so the same distinctive paragraph is reused under different company names. `app/fingerprint.py` (pure, no network) picks up to two phrases of 8–12 words: it splits sentences with the same clause-safe splitter as the red-flag rules, strips everything specific to the recipient or company (emails, URLs, phones, UPI IDs, amounts, dates, greeting names, the company name, the sender's domain), rejects short, stopword-heavy or generic-HR sentences, and never builds a phrase across a removed span. `checks/template_trace.py` searches each phrase in quotes and keeps a result only if **the phrase itself appears verbatim** in its title or snippet (punctuation and case aside):
 
 | Result | Meaning | Status |
 |---|---|---|
@@ -66,7 +66,7 @@ Fake offers are mass-produced templates, so the same distinctive paragraph is re
 | Trusted official domain contains the text | company's own wording | pass |
 | Otherwise, or no phrase could be chosen | — | unknown ("not evidence either way") |
 
-Job boards (Internshala, Indeed, Naukri, LinkedIn…) are ignored for the "reused" test: they list real roles for everyone, so a role-title phrase always matches them. (This was found in the first real run, where a generic "work from home data entry internship" phrase produced a false "mass-produced" warning, and fixed.)
+Google relaxes quotes, so many results only share generic words with the phrase. An earlier version accepted any result containing 60% of the phrase's words; the first real journey run showed that a Reddit thread and a job aggregator could pass, and a scam keyword on such a page would have forced HIGH RISK. Verbatim matching removes that (a regression test covers it). Job boards (Internshala, Indeed, Naukri, LinkedIn, AmbitionBox…) are ignored for the "reused" test: they list real roles for everyone, so a role-title phrase always matches them. (This was found in the first real run, where a generic "work from home data entry internship" phrase produced a false "mass-produced" warning, and fixed.)
 
 **Honest result so far:** on the 8 labelled offers, no real-received offer produced a warning or failure. Email and WhatsApp text is rarely indexed by Google, so this check can only help when scam wording has been quoted somewhere public. That is why there is no template-scam demo sample.
 
@@ -147,9 +147,9 @@ The response adds `timeline` (five nodes: listing, recruiter, interview, payment
 
 ### Journey samples
 
-Both are **synthetic** (our texts, not real messages), served by `/api/samples` with `kind: "journey"`:
+Both are **synthetic** (our texts, not real messages), served by `/api/samples` with `kind: "journey"`. Their searches are recorded in `fixtures/` (70 files in total):
 - **Cloned listing:** a listing on `careers-infosys.in`, a recruiter on Telegram with a Gmail address, chat-only interview, asked to pay, and an offer whose role, pay and city differ from the listing. Expected and tested: High risk, first divergence at the listing.
-- **Genuine journey:** listing on the official site, recruiter on the official domain, official-portal interview, no payment, consistent offer. Expected and tested: not High risk, no divergence.
+- **Genuine journey:** listing on the official site, recruiter on the official domain, official-portal interview, no payment, consistent offer. Expected and tested: not High risk, no divergence. A real-listing version was attempted: Google Jobs returned real Infosys listings, but every apply link was a third-party aggregator rather than `infosys.com` or a known job board, so the tool correctly flags them as "not the company's site". They can't illustrate a clean journey, so this sample stays synthetic.
 
 ## What the user sees (frontend)
 
@@ -176,11 +176,11 @@ OfferProof/
 ├── backend/            FastAPI (Python 3.11), serves the built frontend too
 │   ├── app/            main, pipeline, journey, registry, models, privacy, extract, fingerprint, serp, policy, verify_kit, samples
 │   │   └── checks/     one module per check
-│   ├── fixtures/       56 recorded SerpApi responses (committed) so Cached mode works offline
+│   ├── fixtures/       70 recorded SerpApi responses (committed) so Cached mode works offline
 │   ├── cache/          live-search disk cache (git-ignored)
 │   ├── scripts/        record_fixtures.py (records only searches missing from fixtures/; asks first; --yes skips)
 │   ├── evals/          labeled.jsonl (real-received + synthetic), run_eval.py, report.md
-│   └── tests/          130 tests
+│   └── tests/          131 tests
 └── frontend/           Vite + React + TS + Tailwind v4 (dist/ is served by the backend)
     └── src/            components/, ocr.ts, ocrClean.ts (+ test), useScreenshot.ts, api.ts
 ```
@@ -202,7 +202,7 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 
 ## How it has been verified
 
-- **130 backend tests** and **8 frontend tests** pass, with no network (journey tests cover every new check and override, the timeline rules, redaction in every stage, the never-fetched listing URL, both journey samples, and that the quick check and its samples are unchanged): unit tests (negation, Hinglish, lookalikes, privacy, policy, extraction, phrase selection, classification, verify kit), the 5 acceptance samples against recorded searches, and regression tests built from real emails that slipped through. They also pass with the local `cache/` hidden, so a fresh clone reproduces everything from the committed fixtures.
+- **131 backend tests** and **8 frontend tests** pass, with no network (journey tests cover every new check and override, the timeline rules, redaction in every stage, the never-fetched listing URL, both journey samples, and that the quick check and its samples are unchanged): unit tests (negation, Hinglish, lookalikes, privacy, policy, extraction, phrase selection, classification, verify kit), the 5 acceptance samples against recorded searches, and regression tests built from real emails that slipped through. They also pass with the local `cache/` hidden, so a fresh clone reproduces everything from the committed fixtures.
 - **Browser checks** (Edge, scripted) at 375, 768 and 1280 px: every sample chip, the verify-kit buttons (copy, mailto, careers link), a screenshot upload by picker, paste and drag-drop (a WhatsApp-style image we rendered ourselves, light and dark, not a real chat), cancel, bad type, too big, error and Retry, pause and reduced motion.
 - **Eval (cached, fixtures only).** Real-received: 2 offers, scam recall 1/1, strict 0/1, no genuine rows yet. Synthetic: 6 offers, scam recall 3/3, strict 3/3, false-alarm rate 0/2. Combined: scam recall 4/4, strict 3/4, false-alarm rate 0/2. This is a smoke test, not accuracy; the report says so.
 
@@ -224,10 +224,9 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 
 ## Not done yet
 
-1. **Record the journey samples' searches** (about 13 new searches; needs approval). Until then, the two journey samples run from the built-in known-company list, with their searches shown as unrecorded.
-2. **A real "Genuine journey".** J2 is synthetic. Replacing it with a real Google Jobs listing for a big recruiter needs one live search plus its recording, and approval.
-3. **`render.yaml` and the README** (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work).
-4. **More real labelled offers** for the eval, ideally with some genuine ones; none of the real rows is genuine yet.
-5. **GitHub link** in the footer (currently a placeholder).
-6. **Self-host the OCR assets** instead of loading them from a CDN.
-7. **Future ideas:** a forums check (public complaint threads), an investigator agent that drafts follow-up questions, a WhatsApp bot, a placement-cell dashboard, a moderated reporting channel.
+1. **A real "Genuine journey".** J2 is synthetic (see above). It needs a real listing whose apply link is on the company's own site or a known job board; one query timed out and one returned only aggregators. Worth another try with a different company or with the aggregators reviewed for the known-board list.
+2. **`render.yaml` and the README** (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work).
+3. **More real labelled offers** for the eval, ideally with some genuine ones; none of the real rows is genuine yet.
+4. **GitHub link** in the footer (currently a placeholder).
+5. **Self-host the OCR assets** instead of loading them from a CDN.
+6. **Future ideas:** a forums check (public complaint threads), an investigator agent that drafts follow-up questions, a WhatsApp bot, a placement-cell dashboard, a moderated reporting channel.

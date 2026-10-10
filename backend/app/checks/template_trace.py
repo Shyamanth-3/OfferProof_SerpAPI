@@ -16,9 +16,16 @@ COMPLAINT_SITES = {"consumercomplaints.in", "voxya.com", "complaintboard.in", "m
 JOB_BOARDS = {
     "internshala.com", "indeed.com", "naukri.com", "linkedin.com", "glassdoor.com", "glassdoor.co.in", "shine.com",
     "monsterindia.com", "foundit.in", "freshersworld.com", "apna.co", "jooble.org", "ziprecruiter.com",
-    "simplyhired.com", "timesjobs.com", "hirist.tech", "wellfound.com", "cutshort.io", "letsintern.com",
+    "simplyhired.com", "timesjobs.com", "hirist.tech", "wellfound.com", "cutshort.io", "letsintern.com", "ambitionbox.com",
 }
 _WORD = re.compile(r"[\w'’-]+")
+
+
+def _norm(text: str) -> str:
+    """Lowercase words only, single-spaced, so punctuation and spacing can't hide a verbatim match."""
+    return " ".join(_WORD.findall(text.lower()))
+
+
 # "Software Engineer at Acme Corp", "by Acme", "| Acme Labs": a capitalised name after a company-introducing word
 _NAMED = re.compile(r"(?:\bat|\bby|\bfrom|\bwith|\bjoin|@|\|)\s+([A-Z][\w&.]*(?:\s+[A-Z][\w&.]*){0,3})")
 _NOT_A_COMPANY = {"internship", "intern", "interns", "jobs", "job", "india", "remote", "home", "work", "fresher", "freshers",
@@ -59,11 +66,14 @@ def trace(ctx, serp, text, extracted, *, id, title, weight, other_company_rule=F
         q = f'"{ph}"'
         queries.append(q)
         res = serp.search({"engine": "google", "q": q})
-        need = {w.lower() for w in _WORD.findall(ph)}
+        want = _norm(ph)
         for r in res.data.get("organic_results", []):
             blob = f"{r.get('title', '')} {r.get('snippet', '')}".lower()
-            if len(need & set(_WORD.findall(blob))) / len(need) < 0.6:
-                continue  # the page doesn't really contain this wording
+            if want not in _norm(blob):
+                # Google relaxes quotes and returns pages that merely share words with the phrase. A page counts
+                # only if the phrase itself appears (punctuation and case aside); otherwise a scam keyword on a
+                # loosely related page could force HIGH RISK.
+                continue
             domain = registrable(r.get("link", ""))
             kind = _classify(ctx, blob, domain)
             if kind:

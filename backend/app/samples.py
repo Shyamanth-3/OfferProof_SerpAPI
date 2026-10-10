@@ -50,7 +50,10 @@ JOURNEY_SAMPLES = {
             "offer_text": "Greetings from Infosys Limited. You are selected as Data Entry Executive in Noida. Stipend ₹40,000 per month. Pay ₹1,500 refundable registration fee to infosys.hr@okaxis and send your Aadhaar copy on Telegram t.me/infosyshr today.",
         },
     },
-    # Synthetic: the texts are ours, not a real listing. Swap in a real Google Jobs listing only once one has been recorded.
+    # Synthetic: every text here is ours. A real-listing swap was tried on 2026-10-10: Google Jobs results for Infosys
+    # ("Infosys Systems Engineer", India) were real, but every apply link was a third-party aggregator (jobsnet.in,
+    # niyukjobs.ai, yohire.in, campusdrive.in, fresherjobinfo.in), not infosys.com or a known job board, so the tool
+    # rightly flags them as "not the company's site" and they can't illustrate a clean journey. A second query timed out.
     "J2_GENUINE_JOURNEY": {
         "kind": "journey",
         "label": "Genuine journey",

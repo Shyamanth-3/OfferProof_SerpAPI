@@ -93,7 +93,8 @@ def page(domain, title, snippet=""):
     return {"title": title, "link": f"https://{domain}/x", "snippet": snippet}
 
 
-MATCH = "selected for the remote data annotation internship must deposit the refundable onboarding amount"
+# a hit must contain the phrase verbatim (the selected phrase is the span from "remote data" on)
+MATCH = "selected for the remote data annotation internship and must deposit the refundable onboarding amount today"
 
 
 def test_fail_on_scam_report():
@@ -180,3 +181,20 @@ def test_job_boards_do_not_count_as_reused_wording():
     # and non-board sites still count
     two = [page("a.example", "Hiring at Acme", MATCH), page("b.example", "Join Globex", MATCH)] + boards
     assert template_trace.run(ctx(), Stub(two)).status == "warn"
+
+
+def test_loose_word_overlap_is_not_a_wording_match():
+    # found by the real J1 run: Google relaxed the quotes and returned a Reddit thread and a job aggregator that
+    # merely share generic words with the phrase. Neither contains the phrase, so neither may count.
+    phrase = "Apply after an online assessment and a technical interview"
+    text = f"Our company is hiring an Associate Software Engineer in Bengaluru. {phrase}."
+    c = ctx(text)
+    loose = [page("reddit.com", "Post technical assessment interview : r/SQL", "I had an online assessment and a technical interview"),
+             page("ambitionbox.com", "Associate Software Engineer Jobs in Bengaluru", "online assessment technical interview apply")]
+    assert template_trace.run(c, Stub(loose)).status == "unknown"
+    # a scam keyword on a loosely matching page must not fail the check either (that would force HIGH RISK)
+    scammy = [page("reddit.com", "Is this a scam?", "online assessment technical interview apply after")]
+    assert template_trace.run(c, Stub(scammy)).status == "unknown"
+    # the same pages count once they really contain the phrase (punctuation and case don't matter)
+    exact = [page("blog.example", "Fake job scam alert", f"They sent: “{phrase.upper()}!”")]
+    assert template_trace.run(c, Stub(exact)).status == "fail"
