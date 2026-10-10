@@ -20,6 +20,11 @@ class CacheMiss(Exception):
     pass
 
 
+class CapReached(CacheMiss):
+    """The site's daily limit of live searches is used up. A CacheMiss, so callers that only care that no result
+    exists keep working, but the pipeline can tell the student the real reason."""
+
+
 @dataclass
 class Hit:
     data: dict
@@ -68,7 +73,7 @@ class Serp:
         if self.mode == "cached":
             raise CacheMiss(params.get("q", ""))
         if not _take_live_slot():
-            raise CacheMiss("daily live-search cap reached")
+            raise CapReached("daily live-search cap reached")
         data = self._call(params)
         with self._lock:
             self.used += 1

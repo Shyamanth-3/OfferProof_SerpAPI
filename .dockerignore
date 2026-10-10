@@ -1,0 +1,18 @@
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+
+# secrets and local state never enter the image
+backend/.env
+backend/.venv
+backend/cache
+
+# the frontend is rebuilt inside the image
+frontend/node_modules
+frontend/dist
+
+PROJECT_OVERVIEW.md
+Dockerfile
+.dockerignore

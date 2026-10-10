@@ -11,7 +11,7 @@ from .extract import extract
 from .fingerprint import select_phrases
 from .models import CheckRequest, CheckResponse, Ctx
 from .registry import ORDER, STAGE1, STAGE2
-from .serp import CacheMiss, Serp
+from .serp import CacheMiss, CapReached, Serp
 
 log = logging.getLogger("offerproof")
 CHECK_TIMEOUT = float(os.getenv("SEARCH_TIMEOUT_SECONDS", "8"))
@@ -25,6 +25,8 @@ SLOW = (asyncio.TimeoutError, requests.exceptions.Timeout)
 async def _run(mod, ctx, serp):
     try:
         return await asyncio.wait_for(asyncio.to_thread(mod.run, ctx, serp), CHECK_TIMEOUT)
+    except CapReached:
+        why, skipped = "This site has reached its daily limit of live searches, so this check was skipped.", "capped"
     except CacheMiss:
         why, skipped = "No recorded search for this offer (cached mode).", "not_recorded"
     except SLOW as e:

@@ -13,6 +13,7 @@ const Chip = ({ children, mono }: { children: React.ReactNode; mono?: boolean })
 
 export function Results({ r, quota, mode, onAddCompany, onRetry }: { r: CheckResponse | JourneyResponse; quota: number | null; mode: Mode; onAddCompany: () => void; onRetry: () => void }) {
   const slow = r.checks.filter((c) => c.skipped === "slow").length;
+  const capped = r.checks.filter((c) => c.skipped === "capped").length;
   const journey = "timeline" in r ? r : null;
   const [highlight, setHighlight] = useState<string[]>([]);
   const clearTimer = useRef<number>(0);
@@ -66,6 +67,14 @@ export function Results({ r, quota, mode, onAddCompany, onRetry }: { r: CheckRes
           </div>
         )}
       </section>
+
+      {capped > 0 && (
+        <div role="note" className="fade-up rounded-[14px] border border-amber/50 p-5">
+          <p className="m-0 max-w-[40rem]">
+            This site has reached its daily limit of live searches, so {capped === 1 ? "1 check was" : `${capped} checks were`} skipped. That says nothing about the offer. Try again tomorrow, or switch to Cached and use a sample offer.
+          </p>
+        </div>
+      )}
 
       {slow > 0 && (
         <div role="note" className="fade-up flex flex-wrap items-center justify-between gap-4 rounded-[14px] border border-amber/50 p-5">

@@ -31,7 +31,7 @@ export interface CheckResult {
   evidence: Evidence[];
   flags: string[];
   phrases: string[];
-  skipped?: "slow" | "failed" | "not_recorded" | null; // why the check didn't run
+  skipped?: "slow" | "failed" | "not_recorded" | "capped" | null; // why the check didn't run
 }
 
 export interface Identifiers {

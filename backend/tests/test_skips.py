@@ -58,3 +58,16 @@ def test_checks_that_ran_have_no_skip_reason(monkeypatch):
     monkeypatch.setattr(pl, "Serp", lambda m: type("S", (), {"used": 0, "keys": [], "search": lambda self, p: __import__("app.serp", fromlist=["Hit"]).Hit({}, "2026-01-01T00:00:00+00:00", False)})())
     out = asyncio.run(pl.check(CheckRequest(offer_text=OFFER), "live"))
     assert next(c for c in out.checks if c.id == "text_red_flags").skipped is None
+
+
+def test_a_used_up_daily_live_limit_is_reported_as_capped_not_as_unrecorded(monkeypatch):
+    from app.serp import CapReached, Serp
+
+    monkeypatch.setenv("LIVE_DAILY_CAP", "0")  # the site's allowance is already spent
+    with __import__("pytest").raises(CapReached):
+        Serp("live").search({"engine": "google", "q": "a query that is certainly not cached 91827364"})
+    assert issubclass(CapReached, CacheMiss)
+
+    c = run(monkeypatch, CapReached("cap"))
+    assert c.status == "unknown" and c.skipped == "capped"
+    assert "daily limit of live searches" in c.finding and "No recorded search" not in c.finding
