@@ -8,3 +8,8 @@ frontend/dist/
 
 # real third-party details from received emails: kept locally, never published
 backend/evals/private/
+
+# screenshots pasted into the project folder are never part of the project
+/*.png
+/*.jpg
+/*.jpeg
