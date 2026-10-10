@@ -1,6 +1,6 @@
 ## Accuracy
 
-Mode: `live`. Headline metrics use scam + genuine rows only; unclear rows are excluded. Synthetic rows are texts we wrote; real-received rows are messages students actually got (personal details replaced with placeholders).
+Mode: `cached`. Headline metrics use scam + genuine rows only; unclear rows are excluded. Synthetic rows are texts we wrote; real-received rows are messages students actually got (personal details replaced with placeholders).
 
 ### Real-received: 2 offers (1 scam, 0 genuine, 1 unclear)
 

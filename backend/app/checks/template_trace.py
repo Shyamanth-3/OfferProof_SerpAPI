@@ -11,6 +11,13 @@ ID, TITLE, WEIGHT, ENGINE = "template_trace", "Wording trace", 20, "google"
 SCAM_WORDS = ("scam", "fraud", "fake", "cheated", "beware", "not genuine", "money lost", "cyber crime",
               "consumer complaint", "complaint against")
 COMPLAINT_SITES = {"consumercomplaints.in", "voxya.com", "complaintboard.in", "mouthshut.com"}
+# Job boards list real roles for many companies, so a role-title phrase always matches them. That is not
+# "the same text under another name"; they are ignored for reuse (scam keywords on them still count).
+JOB_BOARDS = {
+    "internshala.com", "indeed.com", "naukri.com", "linkedin.com", "glassdoor.com", "glassdoor.co.in", "shine.com",
+    "monsterindia.com", "foundit.in", "freshersworld.com", "apna.co", "jooble.org", "ziprecruiter.com",
+    "simplyhired.com", "timesjobs.com", "hirist.tech", "wellfound.com", "cutshort.io", "letsintern.com",
+}
 _WORD = re.compile(r"[\w'’-]+")
 
 
@@ -19,6 +26,8 @@ def _classify(ctx, blob: str, domain: str) -> str | None:
         return "scam_report"
     if ctx.trusted and domain in {registrable(t) for t in ctx.trusted}:
         return "official"
+    if domain in JOB_BOARDS:
+        return None
     # "other names" only makes sense when we know which name the offer claims
     if ctx.company and not any(t in blob for t in core_tokens(ctx.company)):
         return "reused"

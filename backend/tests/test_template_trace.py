@@ -167,3 +167,16 @@ def test_pipeline_runs_template_trace_and_reports_phrases(monkeypatch):
     t = next(c for c in out.checks if c.id == "template_trace")
     assert t.status == "fail" and t.phrases and out.verdict == "HIGH_RISK"
     assert "TEMPLATE_REPORTED" in {o.rule for o in out.overrides}
+
+
+def test_job_boards_do_not_count_as_reused_wording():
+    # found by the real fee-scam run: Internshala/Indeed list "work from home data entry internship" for everyone
+    boards = [page("internshala.com", "Data Entry Internships", MATCH), page("in.indeed.com", "Data entry jobs", MATCH),
+              page("www.naukri.com", "Data entry", MATCH)]
+    assert template_trace.run(ctx(), Stub(boards)).status == "unknown"
+    # ...but a scam keyword on a job board is still a scam report
+    r = template_trace.run(ctx(), Stub([page("internshala.com", "Beware: fake internship offers", MATCH)]))
+    assert r.status == "fail"
+    # and non-board sites still count
+    two = [page("a.example", "Hiring at Acme", MATCH), page("b.example", "Join Globex", MATCH)] + boards
+    assert template_trace.run(ctx(), Stub(two)).status == "warn"
