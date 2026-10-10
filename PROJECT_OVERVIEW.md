@@ -192,6 +192,14 @@ OfferProof/
 - **Config (`backend/.env`):** `SERPAPI_API_KEY`, `MODE` (`cached` default or `live`), `LIVE_DAILY_CAP`, `SEARCH_TIMEOUT_SECONDS`. The file is git-ignored.
 - **Git:** the repo is initialised, with one commit per build step.
 
+## Deploying (Render, one Docker service)
+
+- **Repo:** https://github.com/Shyamanth-3/offerproof (public).
+- **Image:** the `Dockerfile` builds the frontend, then serves it from the API in one container (non-root user, no secrets inside, 270 MB). `render.yaml` is the blueprint: Docker web service, Singapore, free plan, health check `/api/health`, auto-deploy on push.
+- **Deploy:** Render dashboard → New → Blueprint → pick the repo → enter `SERPAPI_API_KEY` (never committed) → Apply. Free instances sleep after ~15 minutes idle; the first request afterwards takes 30–60 s.
+- **Live-search protection** (set in `render.yaml`, editable in the Render dashboard): `MODE=cached`; `LIVE_DAILY_CAP=12` real searches a day; `LIVE_RESERVE=100`, which stops live searching for good once the real SerpApi balance drops to 100 (the daily counter alone resets whenever a free instance restarts); `SEARCH_TIMEOUT_SECONDS=20`. If the balance can't be read, live searches are refused. When a limit is hit, checks say "This site has reached its daily limit of live searches" instead of guessing.
+- **Privacy before publishing:** the real received emails carried a named person's email address, two phone numbers and a company labelled "scam" on one student's judgment. In the public repo the company and contacts are fictional (`Examplelearn`, `programs-partner.example`, `9000000011`), the 8 recorded fixtures that contained them were removed, and the commit history was rewritten so none of it survives in any commit. The original rows stay only in a git-ignored local file (`backend/evals/private/`), and the original history is in a local backup bundle outside the repo.
+
 **Run it:**
 ```
 cd frontend; npm run build
@@ -227,7 +235,7 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 ## Not done yet
 
 1. **A real "Genuine journey".** J2 is synthetic (see above). It needs a real listing whose apply link is on the company's own site or a known job board; one query timed out and one returned only aggregators. Worth another try with a different company or with the aggregators reviewed for the known-board list.
-2. **`render.yaml` and the README** (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work).
+2. **The README** (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work). Deployment files are done; the repo has no `LICENSE` yet (all rights reserved by default). (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work).
 3. **More real labelled offers** for the eval, ideally with some genuine ones; none of the real rows is genuine yet.
 4. **GitHub link** in the footer (currently a placeholder).
 5. **Self-host the OCR assets** instead of loading them from a CDN.
