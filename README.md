@@ -36,7 +36,7 @@ OfferProof answers that. For every finding, it shows the live search result behi
 <!-- Replace with a 30-second GIF or the 90-second video -->
 ![OfferProof demo](docs/demo.gif)
 
-Try it: **https://YOUR-APP.onrender.com**. The sample chips run on recorded results and work instantly. Typed text runs live.
+Try it: **https://offerproof.onrender.com/**. The sample chips run on recorded results and work instantly. Typed text runs live.
 
 ---
 
