@@ -61,4 +61,4 @@ None.
 
 ### Unclear offers (information only)
 - `UNCLEAR_STARTUP` [synthetic] → **CAUTION**: The offer came from a free mail address, not the company's own domain.  _(label note: Small startup writing from Gmail; no fee, no pressure; could be real.)_
-- `REAL_WIPRO_THIRD_PARTY` [real-received] → **CAUTION**: The offer names Wipro, but it was sent from programs-partner.example, which is not a Wipro domain.  _(label note: Third-party program using Wipro's name in the subject, sender on a different domain, fees unstated, training before stipend. Not provably fraud.)_
+- `REAL_WIPRO_THIRD_PARTY` [real-received] → **CAUTION**: The offer names Wipro, but it was sent from programs-partner.example, which is not a Wipro domain.  _(label note: Third-party program using Wipro's name in the subject, sender on a different domain, fees unstated, training before stipend. Not provably fraud. (Company and contact details changed for publication.))_
