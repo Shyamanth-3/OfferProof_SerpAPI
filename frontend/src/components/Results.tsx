@@ -1,6 +1,7 @@
 import type { CheckResponse, Mode, Status } from "../api";
 import { CheckCard } from "./CheckCard";
 import { VerdictBadge } from "./VerdictBadge";
+import { VerifyPanel } from "./VerifyPanel";
 
 const ORDER: Status[] = ["fail", "warn", "info", "unknown", "pass"];
 
@@ -76,6 +77,16 @@ export function Results({ r, quota, mode, onAddCompany }: { r: CheckResponse; qu
           ))}
           {r.redacted.length > 0 && <Chip>Aadhaar/PAN removed</Chip>}
         </div>
+        {r.extracted.fingerprint.length > 0 && (
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="meta text-faint">Fingerprint</span>
+            {r.extracted.fingerprint.map((p) => (
+              <span key={p} className="rounded-full border border-line px-3 py-1 font-mono text-[12px] break-words text-dim">
+                “{p}”
+              </span>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-4">
@@ -87,7 +98,9 @@ export function Results({ r, quota, mode, onAddCompany }: { r: CheckResponse; qu
         </div>
       </section>
 
-      <section className="fade-up rounded-[14px] border border-line p-6" style={{ animationDelay: "480ms" }}>
+      {r.verify_kit && <VerifyPanel kit={r.verify_kit} />}
+
+      <section className="fade-up rounded-[14px] border border-line p-6" style={{ animationDelay: "500ms" }}>
         <h2 className="m-0 text-[27px] font-medium">What to do next</h2>
         <ul className="mt-4 mb-0 flex list-disc flex-col gap-2 pl-5">
           {r.next_steps.map((s) => (

@@ -6,6 +6,7 @@ import time
 from . import policy, privacy, verify_kit
 from .checks import result
 from .extract import extract
+from .fingerprint import select_phrases
 from .models import CheckRequest, CheckResponse, Ctx
 from .registry import ORDER, STAGE1, STAGE2
 from .serp import CacheMiss, Serp
@@ -32,6 +33,7 @@ async def check(req: CheckRequest, mode: str) -> CheckResponse:
     t0 = time.monotonic()
     text, redacted = privacy.redact(req.offer_text)  # only redacted text is used from here on
     ex = extract(text, req.company, req.sender_email, req.role)
+    ex.fingerprint = select_phrases(text, ex)
     ctx = Ctx(text, ex.company, ex.role, ex.sender_email, ex.identifiers, extracted=ex)
     serp = Serp(mode)
 

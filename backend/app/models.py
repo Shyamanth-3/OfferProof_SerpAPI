@@ -59,6 +59,7 @@ class Extracted(BaseModel):
     sender_email: Optional[str] = None
     role: Optional[str] = None
     identifiers: Identifiers = Identifiers()
+    fingerprint: list[str] = []  # phrases template_trace will search (shown so the user sees what was read)
 
 
 class Override(BaseModel):

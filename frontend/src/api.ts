@@ -16,6 +16,7 @@ export interface Evidence {
   snippet: string;
   retrieved_at: string;
   from_cache: boolean;
+  kind?: "scam_report" | "reused" | "official" | null;
 }
 
 export interface CheckResult {
@@ -29,6 +30,7 @@ export interface CheckResult {
   query: string | null;
   evidence: Evidence[];
   flags: string[];
+  phrases: string[];
 }
 
 export interface Identifiers {
@@ -44,12 +46,23 @@ export interface Extracted {
   sender_email: string | null;
   role: string | null;
   identifiers: Identifiers;
+  fingerprint: string[];
 }
 
 export interface Override {
   rule: string;
   reason: string;
   verdict: Verdict;
+}
+
+export interface VerifyKit {
+  official_domain: string | null;
+  trusted: boolean;
+  careers_url: string | null;
+  role_on_official_site: boolean | null;
+  message: string;
+  mailto: string | null;
+  advice: string;
 }
 
 export interface CheckResponse {
@@ -62,6 +75,7 @@ export interface CheckResponse {
   redacted: string[];
   checks: CheckResult[];
   next_steps: string[];
+  verify_kit: VerifyKit | null;
   searches_used: number;
   elapsed_ms: number;
   mode: string;
