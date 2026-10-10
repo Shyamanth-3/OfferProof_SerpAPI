@@ -67,6 +67,16 @@ class Override(BaseModel):
     verdict: Verdict
 
 
+class VerifyKit(BaseModel):
+    official_domain: Optional[str] = None
+    trusted: bool = False
+    careers_url: Optional[str] = None
+    role_on_official_site: Optional[bool] = None
+    message: str
+    mailto: Optional[str] = None
+    advice: str
+
+
 class CheckResponse(BaseModel):
     verdict: Verdict
     verdict_label: str
@@ -77,6 +87,7 @@ class CheckResponse(BaseModel):
     redacted: list[str]
     checks: list[CheckResult]
     next_steps: list[str]
+    verify_kit: Optional[VerifyKit] = None
     searches_used: int
     elapsed_ms: int
     mode: str

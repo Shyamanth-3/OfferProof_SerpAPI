@@ -3,7 +3,7 @@ import logging
 import os
 import time
 
-from . import policy, privacy
+from . import policy, privacy, verify_kit
 from .checks import result
 from .extract import extract
 from .models import CheckRequest, CheckResponse, Ctx
@@ -46,6 +46,7 @@ async def check(req: CheckRequest, mode: str) -> CheckResponse:
     d = policy.decide(checks)
     return CheckResponse(
         **d, extracted=ex, redacted=redacted, checks=checks,
+        verify_kit=verify_kit.build(ctx, results),
         next_steps=policy.next_steps(d["verdict"], trusted[0] if trusted else None),
         searches_used=serp.used, elapsed_ms=round((time.monotonic() - t0) * 1000), mode=mode,
     )
