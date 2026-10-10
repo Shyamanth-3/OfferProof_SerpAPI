@@ -1,4 +1,4 @@
-const GITHUB_URL = "https://github.com/"; // TODO: set to the repo URL once it exists
+const GITHUB_URL = "https://github.com/Shyamanth-3/OfferProof_SerpAPI";
 
 export function Footer() {
   return (

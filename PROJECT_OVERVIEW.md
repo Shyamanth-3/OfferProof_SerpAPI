@@ -194,7 +194,7 @@ OfferProof/
 
 ## Deploying (Render, one Docker service)
 
-- **Repo:** https://github.com/Shyamanth-3/offerproof (public).
+- **Repo:** https://github.com/Shyamanth-3/OfferProof_SerpAPI (public).
 - **Image:** the `Dockerfile` builds the frontend, then serves it from the API in one container (non-root user, no secrets inside, 270 MB). `render.yaml` is the blueprint: Docker web service, Singapore, free plan, health check `/api/health`, auto-deploy on push.
 - **Deploy:** Render dashboard → New → Blueprint → pick the repo → enter `SERPAPI_API_KEY` (never committed) → Apply. Free instances sleep after ~15 minutes idle; the first request afterwards takes 30–60 s.
 - **Live-search protection** (set in `render.yaml`, editable in the Render dashboard): `MODE=cached`; `LIVE_DAILY_CAP=12` real searches a day; `LIVE_RESERVE=100`, which stops live searching for good once the real SerpApi balance drops to 100 (the daily counter alone resets whenever a free instance restarts); `SEARCH_TIMEOUT_SECONDS=20`. If the balance can't be read, live searches are refused. When a limit is hit, checks say "This site has reached its daily limit of live searches" instead of guessing.
@@ -237,6 +237,5 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 1. **A real "Genuine journey".** J2 is synthetic (see above). It needs a real listing whose apply link is on the company's own site or a known job board; one query timed out and one returned only aggregators. Worth another try with a different company or with the aggregators reviewed for the known-board list.
 2. **The README** (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work). Deployment files are done; the repo has no `LICENSE` yet (all rights reserved by default). (problem, demo GIF, ASCII flow, engines used, privacy, embedded accuracy report, limitations, future work).
 3. **More real labelled offers** for the eval, ideally with some genuine ones; none of the real rows is genuine yet.
-4. **GitHub link** in the footer (currently a placeholder).
 5. **Self-host the OCR assets** instead of loading them from a CDN.
 6. **Future ideas:** a forums check (public complaint threads), an investigator agent that drafts follow-up questions, a WhatsApp bot, a placement-cell dashboard, a moderated reporting channel.
