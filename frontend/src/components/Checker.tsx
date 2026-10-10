@@ -112,30 +112,31 @@ export function Checker() {
     : null;
 
   // ---- pieces shared by both modes ----
+  const shotInput = (
+    <input
+      ref={fileInput}
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      className="sr-only"
+      tabIndex={-1}
+      aria-hidden="true"
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) shot.start(f);
+        e.target.value = ""; // allow picking the same file again
+      }}
+    />
+  );
   const addShotButton = (
-    <>
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) shot.start(f);
-          e.target.value = ""; // allow picking the same file again
-        }}
-      />
-      <button
-        type="button"
-        onClick={() => fileInput.current?.click()}
-        disabled={shot.s.reading}
-        className="cursor-pointer rounded-full border border-dashed border-line bg-transparent px-4 py-2 text-[14px] text-fg transition-colors hover:border-white disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        Add screenshot
-      </button>
-    </>
+    <button
+      type="button"
+      onClick={() => fileInput.current?.click()}
+      disabled={shot.s.reading}
+      title="Read the text from a screenshot (PNG, JPG or WebP, up to 8 MB)"
+      className="cursor-pointer rounded-full border border-dashed border-line bg-transparent px-4 py-2 text-[14px] text-fg transition-colors hover:border-white disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      Add screenshot
+    </button>
   );
 
   const shotPanel = (
@@ -217,13 +218,35 @@ export function Checker() {
           onKeyDown={(e) => {
             if (view === "quick" && e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit();
           }}
-          placeholder="Paste the full message here…"
+          placeholder="Paste the full message here, or drop or paste a screenshot of it…"
           className={`${inputCls} min-h-[220px] resize-y pb-8 ${dragging ? "border-white" : ""}`}
         />
+        {dragging && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 grid place-items-center rounded-[14px] border-2 border-dashed border-white bg-bg/85 text-[17px] font-medium"
+          >
+            Drop the screenshot here to read its text
+          </div>
+        )}
         <span className="meta pointer-events-none absolute right-4 bottom-3 text-faint">
           {text.length.toLocaleString()} / {MAX.toLocaleString()}
         </span>
       </div>
+
+      <p className="meta mt-2 mb-0 text-dim">
+        <span aria-hidden="true">🖼 </span>
+        Screenshots work too: drag one onto the box, paste it with Ctrl+V, or{" "}
+        <button
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          disabled={shot.s.reading}
+          className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-fg underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          choose an image
+        </button>
+        . PNG, JPG or WebP, up to 8 MB.
+      </p>
 
       {shot.s.review && (
         <p role="note" className="meta mt-2 mb-0 text-amber">
@@ -253,6 +276,7 @@ export function Checker() {
 
   return (
     <section id="check" className="mx-auto w-full max-w-[980px] px-4 pt-24 pb-12">
+      {shotInput}
       <h2 className="m-0 text-[27px] font-medium">Check an offer</h2>
 
       <div role="radiogroup" aria-label="Check mode" className="mt-5 flex w-fit max-w-full flex-wrap rounded-[22px] border border-line p-0.5">
@@ -335,7 +359,6 @@ export function Checker() {
           samples={Object.entries(samples).filter(([, s]) => s.kind === "journey")}
           offerSlot={
             <>
-              <div className="flex flex-wrap gap-2">{addShotButton}</div>
               {shotPanel}
               {offerField}
               <p className="meta m-0 text-faint">Your screenshot is read on this device and never uploaded.</p>
