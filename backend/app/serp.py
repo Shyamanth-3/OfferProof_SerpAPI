@@ -3,10 +3,12 @@ import hashlib
 import json
 import os
 import threading
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -53,6 +55,37 @@ def _take_live_slot() -> bool:
         return True
 
 
+# The daily counter above resets whenever a free host restarts, so the real SerpApi balance is the stronger guard:
+# with LIVE_RESERVE set, live searching stops once the account balance is down to that many searches. The balance
+# endpoint is free; it is read at most once a minute and counted down locally in between. If it can't be read,
+# live searches are refused (the quota matters more than one check).
+_bal = {"at": 0.0, "left": None}
+
+
+def _reserve_ok() -> bool:
+    reserve = int(os.getenv("LIVE_RESERVE", "0"))
+    if reserve <= 0:
+        return True
+    with _cap_lock:
+        stale = _bal["left"] is None or time.monotonic() - _bal["at"] > 60
+    if stale:
+        try:
+            r = requests.get("https://serpapi.com/account.json", params={"api_key": os.getenv("SERPAPI_API_KEY", "")}, timeout=5)
+            left = r.json().get("total_searches_left")
+        except Exception:
+            left = None
+        with _cap_lock:
+            _bal.update(at=time.monotonic(), left=left)
+    with _cap_lock:
+        return _bal["left"] is not None and _bal["left"] > reserve
+
+
+def _spent_one() -> None:
+    with _cap_lock:
+        if _bal["left"] is not None:
+            _bal["left"] -= 1
+
+
 class Serp:
     """One per request. `used` counts real API calls; `keys` lists cache files touched."""
 
@@ -72,9 +105,10 @@ class Serp:
                 return Hit(blob["data"], blob["retrieved_at"], True)
         if self.mode == "cached":
             raise CacheMiss(params.get("q", ""))
-        if not _take_live_slot():
-            raise CapReached("daily live-search cap reached")
+        if not _reserve_ok() or not _take_live_slot():
+            raise CapReached("live-search allowance used up")
         data = self._call(params)
+        _spent_one()
         with self._lock:
             self.used += 1
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")

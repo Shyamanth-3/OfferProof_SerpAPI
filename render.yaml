@@ -1,0 +1,23 @@
+# Render Blueprint: one Docker web service serves the API and the built frontend.
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo -> set SERPAPI_API_KEY -> Apply.
+services:
+  - type: web
+    name: offerproof
+    runtime: docker
+    plan: free            # free instances sleep after ~15 min idle; the first request then takes ~30-60 s
+    region: singapore     # closest to Indian users
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: SERPAPI_API_KEY
+        sync: false       # entered in the Render dashboard; never committed
+      - key: MODE
+        value: cached     # the page's default; visitors can still switch to Live, subject to the limits below
+      - key: LIVE_DAILY_CAP
+        value: "12"       # at most 12 real SerpApi searches a day, about one full live check
+      - key: LIVE_RESERVE
+        value: "100"      # live searching stops for good if the SerpApi balance drops to 100
+      - key: SEARCH_TIMEOUT_SECONDS
+        value: "20"       # SerpApi often takes 10-60 s; a timed-out check wastes the scarce live allowance
