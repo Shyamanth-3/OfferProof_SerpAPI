@@ -156,7 +156,7 @@ Both are **synthetic** (our texts, not real messages), served by `/api/samples` 
 Dark single page (Vite + React + TypeScript + Tailwind v4, no UI or animation library):
 
 - **Hero:** a 3D rotating drum of giant red scam phrases (CSS 3D + `requestAnimationFrame`, pauses off-screen, play/pause button, static under reduced motion).
-- **Checker:** textarea, sample chips, **Add screenshot**, optional details (company, sender, role), Cached/Live toggle. Chip-filled details are cleared when you type your own text so they can't silently override it.
+- **Checker:** textarea, sample chips, **Add screenshot**, optional details (company, sender, role), Cached/Live toggle. **The details fill themselves:** half a second after you paste or type, the page asks `POST /api/extract` (the same regex extractor a check uses; no search, nothing stored, redacted first) and fills company, sender email and role, marked "Detected from your message". It never overwrites anything you typed or a sample chip filled, clears auto-filled values if the text goes away, and sends one request per pause rather than per keystroke. The journey form fills company and role the same way. Chip-filled details are cleared when you type your own text so they can't silently override it.
 - **While checking:** a compact drum spins, then lands on SCAM? / VERIFY / CLEAN / UNSURE.
 - **Mode switch** above the checker: *Quick check* (everything above, unchanged) or *Investigate the full journey*: four collapsible optional panels in journey order (where you found the job, who contacted you, the interview, the offer), journey sample chips, and the same offer box with screenshot reading. Results add **The journey** timeline above the check cards: five nodes (green matches, red diverges, grey unverified, outlined not provided; each also labelled in words), horizontal on desktop and vertical on mobile, a red marker and the callout "Your journey left the company's real process here:" at the first divergence, and clicking a node scrolls to and highlights that stage's check cards.
 - **Result:** verdict badge, "decided by fixed rules, not AI", risk score and coverage, override banner, "What we read" (including the **Fingerprint** phrases), one card per check (status, finding, engine, exact query, up to 3 evidence links with retrieval time; the wording-trace card quotes the searched phrase and groups results as Scam reports / Same text, other names / Company's own site), the **Verify it yourself** panel (open careers page, copy message, email the company, "Role listed on official site ✓"), next steps. If no company was found, a prompt with an "Add company" button.
@@ -180,12 +180,12 @@ OfferProof/
 │   ├── cache/          live-search disk cache (git-ignored)
 │   ├── scripts/        record_fixtures.py (records only searches missing from fixtures/; asks first; --yes skips)
 │   ├── evals/          labeled.jsonl (real-received + synthetic), run_eval.py, report.md
-│   └── tests/          131 tests
+│   └── tests/          141 tests
 └── frontend/           Vite + React + TS + Tailwind v4 (dist/ is served by the backend)
     └── src/            components/, ocr.ts, ocrClean.ts (+ test), useScreenshot.ts, api.ts
 ```
 
-- **API:** `POST /api/check?mode=live|cached`, `POST /api/investigate?mode=live|cached`, `GET /api/samples`, `GET /api/quota`, `GET /api/health`. The response only ever gained fields (`verify_kit`, `extracted.fingerprint`, `phrases`, `evidence[].kind`); nothing was renamed or removed.
+- **API:** `POST /api/check?mode=live|cached`, `POST /api/investigate?mode=live|cached`, `POST /api/extract`, `GET /api/samples`, `GET /api/quota`, `GET /api/health`. The response only ever gained fields (`verify_kit`, `extracted.fingerprint`, `phrases`, `evidence[].kind`); nothing was renamed or removed.
 - **Search layer:** SerpApi official client; disk cache; fixtures; per-request call counter; "no results" treated as a valid empty answer.
 - **Searches per offer:** sender 1, impersonation news 1, job listing 1, registration 1, fraud notice 1 (needs an official domain), payment-ID trace 0–3, wording trace 0–2, careers page 1 (trusted domain only). Typically 6–8, **at most 11**. A full journey adds the recruiter profile, listing wording (up to 2) and the hiring-process page: typically 10–13, **at most 15**.
 - **Quota protection:** live searches capped per day (`LIVE_DAILY_CAP`, default 200); offer text limited to 10,000 characters; per-search timeout `SEARCH_TIMEOUT_SECONDS` (default 8).
@@ -202,7 +202,7 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 
 ## How it has been verified
 
-- **131 backend tests** and **8 frontend tests** pass, with no network (journey tests cover every new check and override, the timeline rules, redaction in every stage, the never-fetched listing URL, both journey samples, and that the quick check and its samples are unchanged): unit tests (negation, Hinglish, lookalikes, privacy, policy, extraction, phrase selection, classification, verify kit), the 5 acceptance samples against recorded searches, and regression tests built from real emails that slipped through. They also pass with the local `cache/` hidden, so a fresh clone reproduces everything from the committed fixtures.
+- **141 backend tests** and **14 frontend tests** pass, with no network (journey tests cover every new check and override, the timeline rules, redaction in every stage, the never-fetched listing URL, both journey samples, and that the quick check and its samples are unchanged): unit tests (negation, Hinglish, lookalikes, privacy, policy, extraction, phrase selection, classification, verify kit), the 5 acceptance samples against recorded searches, and regression tests built from real emails that slipped through. They also pass with the local `cache/` hidden, so a fresh clone reproduces everything from the committed fixtures.
 - **Browser checks** (Edge, scripted) at 375, 768 and 1280 px: every sample chip, the verify-kit buttons (copy, mailto, careers link), a screenshot upload by picker, paste and drag-drop (a WhatsApp-style image we rendered ourselves, light and dark, not a real chat), cancel, bad type, too big, error and Retry, pause and reduced motion.
 - **Eval (cached, fixtures only).** Real-received: 2 offers, scam recall 1/1, strict 0/1, no genuine rows yet. Synthetic: 6 offers, scam recall 3/3, strict 3/3, false-alarm rate 0/2. Combined: scam recall 4/4, strict 3/4, false-alarm rate 0/2. This is a smoke test, not accuracy; the report says so.
 
@@ -221,6 +221,7 @@ Adding a sample or eval row: `.venv\Scripts\python -m scripts.record_fixtures` s
 - **Listing-vs-offer comparison is regex-based**: company, role, pay and city are only compared when both texts state them in a form the extractors recognise.
 - **Recruiter profile lookup is weak evidence by design** (profiles can be faked), so it is context only.
 - **Live searches can be slow.** SerpApi's own timings on ordinary Google and Google Jobs queries ranged from under 1 s to over 60 s in testing, while the live limit is 8 s per check (`SEARCH_TIMEOUT_SECONDS`). A check that times out is shown as "unknown", labelled "too slow" (the response carries `skipped: "slow"`), and the results page offers **Check again**; searches that already finished are served from the local cache and not repeated. A higher `SEARCH_TIMEOUT_SECONDS` (for example 20) completes more checks but makes slow runs wait longer.
+- **Auto-detect sends the text to the backend as you paste**, before you press Check (so the fields can fill). It only runs the regex extractor on the redacted text: no search, no storage. Detection is only as good as the extractor, so a wrong or missing company means editing the field.
 - **Not legal advice.**
 
 ## Not done yet

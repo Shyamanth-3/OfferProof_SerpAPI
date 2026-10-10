@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --test src/ocrClean.test.ts"
+    "test": "node --test src/ocrClean.test.ts src/detect.test.ts"
   },
   "dependencies": {
     "react": "^19.3.0",

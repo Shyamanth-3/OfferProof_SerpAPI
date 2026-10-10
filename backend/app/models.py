@@ -16,6 +16,18 @@ class CheckRequest(BaseModel):
     role: Optional[str] = None
 
 
+class ExtractRequest(BaseModel):
+    offer_text: str = Field(max_length=10_000)  # no minimum: short text just detects nothing
+
+
+class Detected(BaseModel):
+    """What the page can pre-fill while the student is still pasting. No search, no verdict."""
+
+    company: Optional[str] = None
+    sender_email: Optional[str] = None
+    role: Optional[str] = None
+
+
 class Evidence(BaseModel):
     title: str
     url: str

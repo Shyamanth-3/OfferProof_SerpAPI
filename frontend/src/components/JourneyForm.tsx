@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Channel, InterviewFormat, JourneyInput, Sample } from "../api";
+import { applyDetected, type Detected } from "../detect";
 
 const inputCls = "w-full rounded-[14px] border border-line bg-raised px-4 py-3 font-sans text-[16px] text-fg placeholder:text-faint";
 type Tri = "yes" | "no" | "unsure";
@@ -55,10 +56,11 @@ function YesNo({ label, value, onChange }: { label: string; value: Tri; onChange
 
 const clean = (s: string) => s.trim() || null;
 
-export function JourneyForm({ samples, offerSlot, offerText, setOfferText, busy, modeToggle, modeNote, onSubmit }: {
+export function JourneyForm({ samples, offerSlot, offerText, detected, setOfferText, busy, modeToggle, modeNote, onSubmit }: {
   samples: [string, Sample][];
   offerSlot: ReactNode; // the same offer box (with screenshot reading) the quick check uses
   offerText: string;
+  detected: Detected | null; // company and role found in the pasted offer
   setOfferText: (t: string) => void;
   busy: boolean;
   modeToggle: ReactNode;
@@ -67,6 +69,8 @@ export function JourneyForm({ samples, offerSlot, offerText, setOfferText, busy,
 }) {
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
+  const [autoCompany, setAutoCompany] = useState(false); // value came from the pasted offer, not from the student
+  const [autoRole, setAutoRole] = useState(false);
   const [listingUrl, setListingUrl] = useState("");
   const [listingText, setListingText] = useState("");
   const [recName, setRecName] = useState("");
@@ -76,6 +80,15 @@ export function JourneyForm({ samples, offerSlot, offerText, setOfferText, busy,
   const [format, setFormat] = useState<InterviewFormat | "">("");
   const [pay, setPay] = useState<Tri>("unsure");
   const [docs, setDocs] = useState<Tri>("unsure");
+
+  // Pre-fill company and role from the pasted offer, never over what the student typed or picked.
+  useEffect(() => {
+    const out = applyDetected({ company, sender: "", role }, { company: autoCompany, sender: false, role: autoRole }, detected && { ...detected, sender_email: null });
+    setCompany(out.fields.company);
+    setRole(out.fields.role);
+    setAutoCompany(out.auto.company);
+    setAutoRole(out.auto.role);
+  }, [detected]);
 
   const build = (): JourneyInput => {
     const listing = { url: clean(listingUrl), text: clean(listingText) };
@@ -94,6 +107,8 @@ export function JourneyForm({ samples, offerSlot, offerText, setOfferText, busy,
   const hasStage = Boolean(draft.listing || draft.recruiter || draft.interview || draft.offer_text);
 
   const fill = (j: JourneyInput) => {
+    setAutoCompany(false);
+    setAutoRole(false);
     setCompany(j.company ?? "");
     setRole(j.role ?? "");
     setListingUrl(j.listing?.url ?? "");
@@ -132,9 +147,14 @@ export function JourneyForm({ samples, offerSlot, offerText, setOfferText, busy,
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <input id="journey-company" aria-label="Company" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company (we can usually find it)" className={inputCls} />
-        <input aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Role (we can usually find it)" className={inputCls} />
+        <input id="journey-company" aria-label="Company" value={company} onChange={(e) => { setCompany(e.target.value); setAutoCompany(false); }} placeholder="Company (we can usually find it)" className={`${inputCls} ${autoCompany ? "border-blue/60" : ""}`} />
+        <input aria-label="Role" value={role} onChange={(e) => { setRole(e.target.value); setAutoRole(false); }} placeholder="Role (we can usually find it)" className={`${inputCls} ${autoRole ? "border-blue/60" : ""}`} />
       </div>
+      {(autoCompany || autoRole) && (
+        <p role="status" className="meta m-0 -mt-2 text-blue">
+          Detected from your offer: {autoCompany && autoRole ? "company and role" : autoCompany ? "company" : "role"}. Edit if wrong.
+        </p>
+      )}
 
       <Panel n={1} title="Where you found the job" hint="A link and/or the listing text. We never open the link: only its web address is looked at.">
         <input aria-label="Listing link" value={listingUrl} onChange={(e) => setListingUrl(e.target.value)} placeholder="Link to the listing" className={inputCls} />

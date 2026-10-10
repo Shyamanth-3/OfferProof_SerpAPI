@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { getQuota, getSamples, runCheck, runJourney, type CheckResponse, type JourneyInput, type Mode, type Sample } from "../api";
+import { detectOffer, getQuota, getSamples, runCheck, runJourney, type CheckResponse, type JourneyInput, type Mode, type Sample } from "../api";
+import { applyDetected, describeAuto, NO_AUTO, type Auto, type Detected } from "../detect";
 import { JourneyForm } from "./JourneyForm";
 import { Results } from "./Results";
 import { ScamDrum, type DrumWord } from "./ScamDrum";
@@ -31,6 +32,8 @@ export function Checker() {
   const [quota, setQuota] = useState<number | null>(null);
   const [ranMode, setRanMode] = useState<Mode>("cached");
   const [fromChip, setFromChip] = useState(false); // details were filled by a sample chip, not by the user
+  const [detected, setDetected] = useState<Detected | null>(null); // what the backend found in the pasted text
+  const [auto, setAuto] = useState<Auto>(NO_AUTO); // which fields hold an auto-detected value (not typed by the student)
   const area = useRef<HTMLDivElement>(null);
   const detailsEl = useRef<HTMLDetailsElement>(null);
   const companyEl = useRef<HTMLInputElement>(null);
@@ -45,6 +48,7 @@ export function Checker() {
       setCompany("");
       setSender("");
       setRole("");
+      setAuto(NO_AUTO);
       setFromChip(false);
     }
   };
@@ -68,6 +72,28 @@ export function Checker() {
   useEffect(() => {
     getSamples().then(setSamples).catch(() => {});
   }, []);
+
+  // As the text is pasted or typed, ask the backend what company, sender and role it contains (regex only, no search).
+  useEffect(() => {
+    if (text.trim().length < MIN) return setDetected(null);
+    const ctl = new AbortController();
+    const id = window.setTimeout(() => {
+      detectOffer(text, ctl.signal).then(setDetected).catch(() => {}); // a convenience: if it fails, the student just types
+    }, 450);
+    return () => {
+      window.clearTimeout(id);
+      ctl.abort();
+    };
+  }, [text]);
+
+  // Pre-fill the fields from it, but never over something the student typed or picked.
+  useEffect(() => {
+    const out = applyDetected({ company, sender, role }, auto, detected);
+    setCompany(out.fields.company);
+    setSender(out.fields.sender);
+    setRole(out.fields.role);
+    setAuto(out.auto);
+  }, [detected]);
 
   const busy = phase === "loading" || phase === "settling";
 
@@ -308,6 +334,7 @@ export function Checker() {
                     setCompany(s.company ?? "");
                     setSender(s.sender_email ?? "");
                     setRole(s.role ?? "");
+                    setAuto(NO_AUTO);
                     setFromChip(true);
                   }}
                   className="cursor-pointer rounded-full border border-line bg-transparent px-4 py-2 text-[14px] text-fg transition-colors hover:border-white"
@@ -332,10 +359,15 @@ export function Checker() {
             <details ref={detailsEl} className="mt-3" open={Boolean(company || sender || role) || undefined}>
               <summary className="meta cursor-pointer text-dim">Details (optional)</summary>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <input ref={companyEl} aria-label="Company" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company" className={inputCls} />
-                <input aria-label="Sender email" type="email" value={sender} onChange={(e) => setSender(e.target.value)} placeholder="Sender email" className={inputCls} />
-                <input aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Role" className={inputCls} />
+                <input ref={companyEl} aria-label="Company" value={company} onChange={(e) => { setCompany(e.target.value); setAuto((a) => ({ ...a, company: false })); }} placeholder="Company" className={`${inputCls} ${auto.company ? "border-blue/60" : ""}`} />
+                <input aria-label="Sender email" type="email" value={sender} onChange={(e) => { setSender(e.target.value); setAuto((a) => ({ ...a, sender: false })); }} placeholder="Sender email" className={`${inputCls} ${auto.sender ? "border-blue/60" : ""}`} />
+                <input aria-label="Role" value={role} onChange={(e) => { setRole(e.target.value); setAuto((a) => ({ ...a, role: false })); }} placeholder="Role" className={`${inputCls} ${auto.role ? "border-blue/60" : ""}`} />
               </div>
+              {(auto.company || auto.sender || auto.role) && (
+                <p role="status" className="meta mt-2 mb-0 text-blue">
+                  Detected from your message: {describeAuto(auto)}. Edit any field that is wrong.
+                </p>
+              )}
             </details>
 
             <div className="mt-5 flex flex-wrap items-center gap-4">
@@ -365,6 +397,7 @@ export function Checker() {
             </>
           }
           offerText={text}
+          detected={detected}
           setOfferText={(t) => {
             setText(t);
             shot.clearReview();

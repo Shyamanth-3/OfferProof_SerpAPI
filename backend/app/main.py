@@ -9,7 +9,9 @@ from fastapi.staticfiles import StaticFiles
 
 from . import serp  # noqa: F401  (loads .env)
 from .journey import investigate
-from .models import CheckRequest, CheckResponse, JourneyInput, JourneyResponse
+from . import privacy
+from .extract import extract
+from .models import CheckRequest, CheckResponse, Detected, ExtractRequest, JourneyInput, JourneyResponse
 from .pipeline import check
 from .samples import JOURNEY_SAMPLES, SAMPLES
 
@@ -31,6 +33,15 @@ async def check_offer(req: CheckRequest, mode: Optional[Mode] = None):
 @app.post("/api/investigate", response_model=JourneyResponse)
 async def investigate_journey(req: JourneyInput, mode: Optional[Mode] = None):
     return await investigate(req, mode or default_mode())  # 422 comes from JourneyInput if no stage has content
+
+
+@app.post("/api/extract", response_model=Detected)
+def detect_fields(req: ExtractRequest):
+    """Company, sender email and role found in the text, so the page can pre-fill them. Regex only: nothing is
+    searched, stored or scored. The text is redacted first, exactly like a check."""
+    text, _ = privacy.redact(req.offer_text)
+    ex = extract(text)
+    return Detected(company=ex.company, sender_email=ex.sender_email, role=ex.role)
 
 
 @app.get("/api/health")

@@ -149,3 +149,11 @@ export const runJourney = (body: JourneyInput, mode: Mode) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
+export const detectOffer = (offer_text: string, signal?: AbortSignal) =>
+  http<{ company: string | null; sender_email: string | null; role: string | null }>("/api/extract", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ offer_text }),
+    signal,
+  });
