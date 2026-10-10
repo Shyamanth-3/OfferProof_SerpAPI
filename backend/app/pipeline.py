@@ -4,17 +4,14 @@ import os
 import time
 
 from . import policy, privacy
-from .checks import company_fraud_notice, identifier_trace, impersonation_context, job_listing, registration, sender_identity, text_red_flags
 from .checks import result
 from .extract import extract
 from .models import CheckRequest, CheckResponse, Ctx
+from .registry import ORDER, STAGE1, STAGE2
 from .serp import CacheMiss, Serp
 
 log = logging.getLogger("offerproof")
 CHECK_TIMEOUT = float(os.getenv("SEARCH_TIMEOUT_SECONDS", "8"))
-STAGE1 = [sender_identity, impersonation_context, job_listing, registration, text_red_flags]
-STAGE2 = [company_fraud_notice, identifier_trace]  # need the official domain from stage 1
-ORDER = [sender_identity, identifier_trace, company_fraud_notice, impersonation_context, job_listing, registration, text_red_flags]
 
 
 async def _run(mod, ctx, serp):
@@ -35,7 +32,7 @@ async def check(req: CheckRequest, mode: str) -> CheckResponse:
     t0 = time.monotonic()
     text, redacted = privacy.redact(req.offer_text)  # only redacted text is used from here on
     ex = extract(text, req.company, req.sender_email, req.role)
-    ctx = Ctx(text, ex.company, ex.role, ex.sender_email, ex.identifiers)
+    ctx = Ctx(text, ex.company, ex.role, ex.sender_email, ex.identifiers, extracted=ex)
     serp = Serp(mode)
 
     results = dict(zip((m.ID for m in STAGE1), await asyncio.gather(*(_run(m, ctx, serp) for m in STAGE1))))

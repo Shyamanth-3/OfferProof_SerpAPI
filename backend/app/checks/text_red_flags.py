@@ -80,6 +80,15 @@ def _norm(text: str) -> str:
     return re.sub(r"\b(rs|inr)\.\s*", r"\1 ", text, flags=re.I)  # "Rs. 500" -> "Rs 500", so the dot isn't a clause end
 
 
+_SENT_END = re.compile(r"[!?\n]|\.(?=\s)")
+
+
+def sentences(text: str) -> list[str]:
+    """Clause-safe sentence split: only '.' followed by whitespace ends a sentence, so Rs. 500,
+    t.me/x, URLs, emails and decimals stay whole (same normalisation the red-flag rules use)."""
+    return [s.strip() for s in _SENT_END.split(_norm(text)) if s.strip()]
+
+
 def _negated(text: str, start: int) -> bool:
     clause_start = max((m.end() for m in _CLAUSE_END.finditer(text, 0, start)), default=0)
     words = text[clause_start:start].split()[-6:]  # negator must sit within 6 words before the match

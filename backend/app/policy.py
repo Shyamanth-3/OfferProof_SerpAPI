@@ -2,6 +2,7 @@
 from typing import Optional
 
 from .models import CheckResult, Override
+from .registry import TOTAL_WEIGHT
 
 RANK = {"NOT_ENOUGH_EVIDENCE": 0, "NO_RED_FLAGS": 1, "CAUTION": 2, "HIGH_RISK": 3}
 LABELS = {
@@ -73,14 +74,20 @@ def job_guarantee(checks):
                         reason="No genuine employer can guarantee you a job. “Guaranteed placement” programs are usually paid courses sold as internships.")
 
 
-RULES = [fee_demanded, lookalike_domain, identifier_reported, free_mail_sender, off_platform_only, third_party_sender, job_guarantee]
+def template_reported(checks):
+    c = _get(checks, "template_trace")
+    if c and c.status == "fail":
+        return Override(rule="TEMPLATE_REPORTED", verdict="HIGH_RISK", reason="This message's wording matches text reported as a scam elsewhere.")
+
+
+RULES = [fee_demanded, lookalike_domain, identifier_reported, free_mail_sender, off_platform_only, third_party_sender, job_guarantee, template_reported]
 
 
 def decide(checks: list[CheckResult]) -> dict:
     scored = [c for c in checks if c.scored]  # unknown and info never count, for or against
     weight = sum(c.weight for c in scored)
     score = round(100 * sum(POINTS[c.status] * c.weight for c in scored) / weight) if weight else None
-    coverage = weight / 100
+    coverage = weight / TOTAL_WEIGHT
 
     if coverage < 0.5:
         verdict = "NOT_ENOUGH_EVIDENCE"

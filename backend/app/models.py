@@ -22,6 +22,7 @@ class Evidence(BaseModel):
     snippet: str = ""
     retrieved_at: str
     from_cache: bool = False
+    kind: Optional[str] = None  # template_trace: scam_report | reused | official
 
 
 class CheckResult(BaseModel):
@@ -35,6 +36,7 @@ class CheckResult(BaseModel):
     query: Optional[str] = None
     evidence: list[Evidence] = []
     flags: list[str] = []
+    phrases: list[str] = []  # template_trace: the exact phrases that were searched
     # internal facts for policy (official_domain, lookalike, ...); not sent to clients
     meta: dict = Field(default_factory=dict, exclude=True)
 
@@ -92,6 +94,7 @@ class Ctx:
     official: list[str] = field(default_factory=list)  # filled after sender_identity
     trusted: list[str] = field(default_factory=list)  # subset of official: knowledge panel or known-company list
     sender_on_official: bool = False
+    extracted: Optional[Extracted] = None
 
     @property
     def official_domain(self) -> Optional[str]:

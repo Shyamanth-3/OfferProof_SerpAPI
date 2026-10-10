@@ -88,7 +88,7 @@ def R(id, status, w, **kw):
 
 def test_unknown_and_info_excluded_from_score():
     d = policy.decide([R("sender_identity", "pass", 30), R("text_red_flags", "pass", 30), R("a", "unknown", 25), R("b", "info", 0)])
-    assert d["risk_score"] == 0 and d["coverage"] == 0.6
+    assert d["risk_score"] == 0 and d["coverage"] == 60 / policy.TOTAL_WEIGHT
 
 
 def test_low_coverage_is_not_enough_evidence():
