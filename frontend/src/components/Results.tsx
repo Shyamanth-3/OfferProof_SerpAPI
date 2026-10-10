@@ -71,7 +71,7 @@ export function Results({ r, quota, mode, onAddCompany, onRetry }: { r: CheckRes
       {capped > 0 && (
         <div role="note" className="fade-up rounded-[14px] border border-amber/50 p-5">
           <p className="m-0 max-w-[40rem]">
-            This site has reached its daily limit of live searches, so {capped === 1 ? "1 check was" : `${capped} checks were`} skipped. That says nothing about the offer. Try again tomorrow, or switch to Cached and use a sample offer.
+            This site has reached its limit of live searches, so {capped === 1 ? "1 check was" : `${capped} checks were`} skipped. That says nothing about the offer. Try again later, or switch to Cached and use a sample offer.
           </p>
         </div>
       )}

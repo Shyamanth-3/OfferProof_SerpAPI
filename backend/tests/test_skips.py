@@ -70,4 +70,4 @@ def test_a_used_up_daily_live_limit_is_reported_as_capped_not_as_unrecorded(monk
 
     c = run(monkeypatch, CapReached("cap"))
     assert c.status == "unknown" and c.skipped == "capped"
-    assert "daily limit of live searches" in c.finding and "No recorded search" not in c.finding
+    assert "limit of live searches" in c.finding and "No recorded search" not in c.finding

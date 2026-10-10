@@ -26,7 +26,7 @@ async def _run(mod, ctx, serp):
     try:
         return await asyncio.wait_for(asyncio.to_thread(mod.run, ctx, serp), CHECK_TIMEOUT)
     except CapReached:
-        why, skipped = "This site has reached its daily limit of live searches, so this check was skipped.", "capped"
+        why, skipped = "This site has reached its limit of live searches, so this check was skipped.", "capped"
     except CacheMiss:
         why, skipped = "No recorded search for this offer (cached mode).", "not_recorded"
     except SLOW as e:
