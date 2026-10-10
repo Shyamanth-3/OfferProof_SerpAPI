@@ -43,7 +43,12 @@ export function CheckCard({ check, delay, highlighted = false }: { check: CheckR
         <h3 className="m-0 text-[17px] font-medium">{check.title}</h3>
         <span className="sr-only">Status: {s}</span>
         {s === "info" && <span className="meta ml-auto rounded-full border border-blue/40 px-2.5 py-0.5 text-blue">context</span>}
-        {s === "unknown" && <span className="meta ml-auto rounded-full border border-line px-2.5 py-0.5 text-dim">couldn't check</span>}
+        {s === "unknown" && (
+          <span className="meta ml-auto rounded-full border border-line px-2.5 py-0.5 text-dim">
+            {/* "unknown" covers three different things; saying which is the point of this badge */}
+            {check.skipped ? "couldn't check" : check.query ? "nothing found" : "not checked"}
+          </span>
+        )}
       </header>
 
       <p className="mt-3 mb-0 text-dim">{check.finding}</p>
