@@ -16,3 +16,4 @@ frontend/dist
 PROJECT_OVERVIEW.md
 Dockerfile
 .dockerignore
+backend/evals/private
